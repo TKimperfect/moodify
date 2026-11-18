@@ -1,0 +1,20 @@
+{
+  "name": "moodify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MOODIFY - AI-powered emotional music discovery platform",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "test": "npm test --prefix server && npm test --prefix client",
+    "db:seed": "npm run db:seed --prefix server",
+    "db:check": "npm run db:check --prefix server",
+    "music:import": "npm run music:import --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
+}

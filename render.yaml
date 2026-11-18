@@ -1,0 +1,32 @@
+# Render Blueprint for the MOODIFY backend (https://render.com/docs/blueprint-spec)
+# In Render: New > Blueprint > pick this repository. Render reads this file,
+# creates the service, and asks for the values marked "sync: false".
+services:
+  - type: web
+    name: moodify-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      # Your Vercel address, e.g. https://moodify-yourname.vercel.app
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: JAMENDO_CLIENT_ID
+        sync: false
+      # Optional (leave empty when Render asks):
+      - key: ANTHROPIC_API_KEY
+        sync: false

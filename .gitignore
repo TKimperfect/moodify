@@ -1,0 +1,17 @@
+# Installed packages (re-created by "npm install")
+node_modules/
+
+# Build output
+dist/
+
+# Secret settings - NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Logs and system files
+*.log
+.DS_Store
+
+# Music imported on your own computer (re-create with: npm run music:import)
+server/data/
