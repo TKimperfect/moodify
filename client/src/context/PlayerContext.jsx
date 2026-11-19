@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { queueReducer, restoreQueue, currentSong, EMPTY_QUEUE } from '../lib/playerQueue.js';
 import { readJson, writeJson } from '../lib/storage.js';
 import { apiGet, resolveApiUrl } from '../lib/api.js';
+import { deezerPreview, deezerTrackId } from '../lib/deezerPreview.js';
 import { useFeedback } from './FeedbackContext.jsx';
 
 // The music player. It lives above every page (in main.jsx), so the music
@@ -42,6 +43,7 @@ export function PlayerProvider({ children }) {
   const [yt, setYt] = useState({ songId: null, status: 'idle', videoId: null, message: null });
   const { markSkipped, markPlayed } = useFeedback();
   const playedLogged = useRef(null);
+  const audioSource = useRef(null); // { songId, ready: Promise until the audio address is known }
   const ytPlayer = useRef(null);
   const wantPlay = useRef(false);
 
@@ -201,18 +203,42 @@ export function PlayerProvider({ children }) {
     if (audio.dataset.songId !== current.id) {
       audio.dataset.songId = current.id;
       playedLogged.current = null;
-      audio.src = resolveApiUrl(current.playback.audio_url);
       setTime({ current: 0, duration: current.playback.duration_s ?? 0 });
+      const serverUrl = resolveApiUrl(current.playback.audio_url);
+      const trackId = deezerTrackId(current);
+      if (trackId) {
+        // Deezer previews depend on the listener's country, so this browser
+        // asks Deezer first; the server is the fallback.
+        audio.removeAttribute('src');
+        const songId = current.id;
+        audioSource.current = {
+          songId,
+          ready: deezerPreview(trackId)
+            .catch(() => null)
+            .then((url) => {
+              if (audio.dataset.songId === songId) audio.src = url ?? serverUrl;
+            }),
+        };
+      } else {
+        audio.src = serverUrl;
+        audioSource.current = { songId: current.id, ready: null };
+      }
     }
     if (playRequest === 0) {
       setStatus('paused'); // restored from a previous visit: wait for the user
       return;
     }
     setStatus('loading');
-    audio.play().catch((error) => {
-      // Browsers block sound until the user has clicked something.
-      setStatus(error.name === 'NotAllowedError' ? 'paused' : 'error');
-    });
+    const start = () => {
+      if (audio.dataset.songId !== current.id) return; // moved on meanwhile
+      audio.play().catch((error) => {
+        // Browsers block sound until the user has clicked something.
+        setStatus(error.name === 'NotAllowedError' ? 'paused' : 'error');
+      });
+    };
+    const pending = audioSource.current?.songId === current.id ? audioSource.current.ready : null;
+    if (pending) pending.then(start);
+    else start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, playRequest, queueState.ended, engine]);
 
