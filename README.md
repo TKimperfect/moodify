@@ -169,9 +169,19 @@ Needs `JAMENDO_CLIENT_ID`. Downloads the tag file from GitHub and imports **ever
 npm run music:prune-languages
 ```
 
-Playlists mix languages, so each song gets the language it is really sung in, not its playlist's (`server/src/services/music/language.js`): Korean, Japanese or Chinese writing in the title or artist; the same artist's other songs; Malay words, or French / Spanish words and accents ("Other languages"); artists known from Western music (MuSe, English playlists) are English; otherwise, for an unknown artist with a Latin title, the language of the playlists the song was found in. The import prints how many songs got another language, with examples. Songs that also came from MuSe keep their MuSe moods.
+Playlists mix languages (a "Chinese" playlist can hold French rap, a "Korean" one Japanese metal), so each song gets the language it is really sung in, not its playlist's (`server/src/services/music/language.js`). In order:
 
-To fix the languages of songs that are already imported, without searching Deezer again (a few minutes):
+1. **Instrumental**: piano or karaoke versions, music box, spa / meditation / sleep music, lo-fi beats.
+2. **Marks in the title**: "(Japanese Ver.)", "(國)", "(粵語)"…
+3. **Writing**: Korean, Japanese, Chinese, Thai, Cyrillic… in the title.
+4. **ISRC**, the international code of every recording (`server/src/services/music/isrc.js`). Its first two letters are the country of the label: JP, KR, HK, TW, MY, ID… Some labels outside Asia are known to release Korean songs (JYP's and HYBE's US labels); codes from distributors that anyone can use (TuneCore, DistroKid, CD Baby…) say nothing. A K-pop group's release with a Japanese code is their Japanese version. A Hong Kong code is Cantonese unless the song is in a Mandarin playlist (except for singers whose songs are mostly in Cantonese playlists).
+5. **The artist**: what all of the artist's songs say together.
+6. **Words**: Malay words (Indonesian when the artist's label is Indonesian), French / Spanish / German… words and accents ("Other languages").
+7. Otherwise **English**.
+
+The ISRCs are looked up on Deezer once (one request per song, about 2.5 hours for 58,000 songs; MuSe needs one song per artist) and kept in `server/data/isrc-cache.json`. The import prints how many songs got another language, with examples. Songs that also came from MuSe keep their MuSe moods.
+
+To fix the languages of songs that are already imported, without searching Deezer playlists again (only missing ISRCs are looked up; `Ctrl + C` saves and stops):
 
 ```bash
 npm run music:relabel-languages
@@ -187,9 +197,9 @@ Downloads MuSe from Zenodo (about 15 MB) and looks up every usable song on Deeze
 
 If MOODIFY ever becomes commercial, MTG-Jamendo needs written permission from Jamendo first.
 
-## Songs in seven languages (1.1)
+## Songs in seven languages (1.1, Indonesian since 1.2.14)
 
-Languages: **Malay, Mandarin, Cantonese, Taiwanese Hokkien, Korean, Japanese, English**. Users choose them on the home page (per mood) and in Profile > Music preferences (the default when none is chosen). The assistant understands requests like "想听粤语歌", "lagu melayu" or "K-pop", and also feelings written in Chinese or Malay.
+Languages: **Malay, Indonesian, Mandarin, Cantonese, Korean, Japanese, English** (Taiwanese Hokkien was offered until 1.2.13: it cannot be told apart from Mandarin by the title, so it was removed; saved choices of it are ignored). Users choose them on the home page (per mood) and in Profile > Music preferences (the default when none is chosen). The assistant understands requests like "想听粤语歌", "lagu melayu", "lagu indonesia" or "K-pop", and also feelings written in Chinese or Malay.
 
 When too few songs exist in a chosen language for a mood, instrumental music fills the rest of the list (and says so).
 

@@ -1,5 +1,6 @@
 // The user's own profile (display name, favourite genres and languages).
 import { unwrap } from '../lib/httpError.js';
+import { withoutRetired } from '../data/taxonomy.js';
 
 const COLUMNS = 'id,display_name,favorite_genres,favorite_languages,created_at,updated_at';
 const OLD_COLUMNS = 'id,display_name,favorite_genres,created_at,updated_at';
@@ -12,7 +13,8 @@ async function withColumns(run) {
     result = await run(OLD_COLUMNS);
     if (result.data) result.data = { ...result.data, favorite_languages: [] };
   }
-  return unwrap(result);
+  const profile = unwrap(result);
+  return { ...profile, favorite_languages: withoutRetired(profile.favorite_languages ?? []) };
 }
 
 export async function getProfile(db, user) {

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importMuse } from '../src/services/music/datasetImport.js';
 import { saveCatalog, moodCounts } from './catalogStore.js';
-import { readCatalog, relabel } from './languageLabels.js';
+import { readCatalog, relabel, updateIsrcs } from './languageLabels.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // v2: progress saved by version 1.2.2 is ignored (its lookups were faulty).
@@ -80,8 +80,11 @@ try {
   await saveProgress(progress);
   if (songs.length === 0) throw new Error('No songs were found on Deezer yet (see the reasons above)');
   console.log(`  moods: ${moodCounts(songs)}`);
-  // Languages, using what the language playlists know about each artist.
-  const { muse } = relabel({ deezer: await readCatalog('deezer-catalog'), muse: songs });
+  // Languages, using what the language playlists know about each artist and
+  // where each artist's label is (from the ISRC of one of their songs).
+  const deezer = await readCatalog('deezer-catalog');
+  const isrcs = await updateIsrcs({ deezer, muse: songs }, { shouldStop: () => stopRequested });
+  const { muse } = relabel({ deezer, muse: songs, isrcs });
   await saveCatalog('muse-catalog', 'muse', muse);
   console.log(stopRequested ? 'Stopped early. Run the same command again to continue.' : 'All MuSe songs checked.');
   console.log('Restart "npm run dev" to use the new songs.');

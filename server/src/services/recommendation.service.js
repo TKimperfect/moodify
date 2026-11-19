@@ -1,4 +1,5 @@
 // Connects the engine to the song storage and to what is known about the user.
+import { withoutRetired } from '../data/taxonomy.js';
 import { songRepository } from '../repositories/song.repository.js';
 import { recommend } from './recommendation/engine.js';
 import { listFavoriteIds } from './favorites.service.js';
@@ -35,8 +36,9 @@ export async function getRecommendations({ profile, feedback, limit }, db = null
         usedFavoriteGenres = true;
       }
       // Same for languages.
-      if ((profile.languages ?? []).length === 0 && account?.favorite_languages?.length) {
-        profile = { ...profile, languages: account.favorite_languages };
+      const favoriteLanguages = withoutRetired(account?.favorite_languages ?? []);
+      if ((profile.languages ?? []).length === 0 && favoriteLanguages.length) {
+        profile = { ...profile, languages: favoriteLanguages };
         usedFavoriteLanguages = true;
       }
     } catch (error) {

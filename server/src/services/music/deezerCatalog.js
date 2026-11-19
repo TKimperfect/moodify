@@ -1,4 +1,4 @@
-// Builds a catalogue of real songs in seven languages from Deezer playlists.
+// Builds a catalogue of real songs from Deezer playlists in six languages.
 // For each language and mood, it searches Deezer for a matching playlist
 // (e.g. "粤语 伤感", "lagu melayu sedih") and takes songs from it. The mood comes
 // from the search; the language is worked out per song (language.js), because
@@ -57,18 +57,6 @@ export const CATALOG_QUERIES = {
     motivated: [q('粤语 励志'), q('廣東歌 勵志'), q('cantopop workout'), q('cantopop upbeat'), q('廣東歌 正能量'), q('cantopop dance'), q('粵語 熱血')],
     empty: [q('粤语 失恋'), q('廣東歌 失戀'), q('cantopop night'), q('cantonese indie', 'indie')],
     romantic: [q('粤语 情歌'), q('廣東歌 情歌'), q('cantopop love songs'), q('cantonese love songs')],
-  },
-  nan: {
-    happy: [q('台語 快樂'), q('台语歌'), q('hokkien happy'), q('taiwanese hokkien songs'), q('台語 流行'), q('閩南語歌')],
-    sad: [q('台語 悲情'), q('台语 伤感'), q('hokkien sad'), q('taiwanese hokkien sad')],
-    lonely: [q('台語 孤單'), q('台语 孤单'), q('hokkien lonely'), q('台語 抒情'), q('台語 失戀')],
-    angry: [q('台語 搖滾', 'rock'), q('台语 摇滚', 'rock'), q('hokkien rock', 'rock'), q('台語 重金屬', 'rock')],
-    anxious: [q('台語 療癒'), q('台语 治愈'), q('hokkien healing')],
-    calm: [q('台語 放鬆'), q('台语 安静'), q('hokkien chill'), q('台語 民謠', 'folk')],
-    nostalgic: [q('台語 經典 老歌'), q('台语 经典'), q('hokkien classics'), q('taiwanese oldies'), q('台語 老歌'), q('閩南語 經典')],
-    motivated: [q('台語 勵志'), q('台语 励志'), q('hokkien motivation')],
-    empty: [q('台語 心碎'), q('台语 失恋'), q('hokkien heartbreak'), q('台語 傷心')],
-    romantic: [q('台語 情歌'), q('台语 情歌'), q('hokkien love songs'), q('閩南語 情歌')],
   },
   ko: {
     happy: [q('kpop happy'), q('신나는 노래')], sad: [q('korean sad ballad'), q('슬픈 발라드')],

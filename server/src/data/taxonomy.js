@@ -148,14 +148,18 @@ export const MOOD_LABELS = {
 export const LANGUAGES = {
   en: 'English',
   ms: 'Malay',
+  id: 'Indonesian',
   zh: 'Mandarin',
   yue: 'Cantonese',
-  nan: 'Taiwanese Hokkien',
   ko: 'Korean',
   ja: 'Japanese',
 };
 export const LANGUAGE_IDS = Object.keys(LANGUAGES);
 export const SONG_LANGUAGE_IDS = [...LANGUAGE_IDS, 'instrumental', 'other'];
+// Languages MOODIFY offered before (Taiwanese Hokkien until 1.2.13): still
+// accepted in saved preferences, and quietly left out.
+export const RETIRED_LANGUAGE_IDS = ['nan'];
+export const withoutRetired = (languages) => (Array.isArray(languages) ? languages.filter((language) => !RETIRED_LANGUAGE_IDS.includes(language)) : languages);
 
 // Shared rules for songs whose moods are known but whose energy, effects and
 // tempo must be estimated (imported songs).

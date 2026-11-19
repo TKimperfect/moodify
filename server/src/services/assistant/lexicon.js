@@ -90,10 +90,10 @@ const lang = (latin, cjk = '') => ({
 });
 export const LANGUAGE_PATTERNS = {
   en: lang('english songs?|english music|in english|western songs?|english pop'),
-  ms: lang('malay|melayu|bahasa|lagu'),
+  ms: lang('malay|melayu|bahasa(?!\\s+indonesia)|lagu(?!\\s+indo)'),
+  id: lang('indonesian|bahasa indonesia|lagu indonesia|lagu indo|indo pop'),
   zh: lang('mandarin|chinese songs?|chinese music|c-?pop|mandopop', '华语|華語|国语|國語|中文歌|中文|普通话'),
   yue: lang('cantonese|canto-?pop|hong ?kong songs?', '粤语|粵語|广东歌|廣東歌|港乐|港樂'),
-  nan: lang('hokkien|taiwanese', '台语|台語|闽南|閩南'),
   ko: lang('korean|k-?pop|k-?ballad', '韩语|韓語|韩国|韓國|한국|케이팝'),
   ja: lang('japanese|j-?pop|j-?rock|anime songs?', '日语|日語|日本|日文|アニソン|邦楽'),
 };

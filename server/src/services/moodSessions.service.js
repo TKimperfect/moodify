@@ -1,5 +1,6 @@
 // Saved mood profiles ("mood sessions"): the user's mood history.
 import { unwrap, HttpError } from '../lib/httpError.js';
+import { withoutRetired } from '../data/taxonomy.js';
 
 const COLUMNS = 'id,moods,energy,intensity,genres,desired_effect,tempo,languages,source,created_at';
 const OLD_COLUMNS = 'id,moods,energy,intensity,genres,desired_effect,tempo,source,created_at';
@@ -18,7 +19,7 @@ export async function saveMoodSession(db, userId, { profile, source }) {
 export async function listMoodSessions(db, { limit }) {
   let result = await db.from('mood_sessions').select(COLUMNS).order('created_at', { ascending: false }).limit(limit);
   if (missingColumn(result)) result = await db.from('mood_sessions').select(OLD_COLUMNS).order('created_at', { ascending: false }).limit(limit);
-  return unwrap(result).map((session) => ({ languages: [], ...session }));
+  return unwrap(result).map((session) => ({ ...session, languages: withoutRetired(session.languages ?? []) }));
 }
 
 export async function deleteMoodSession(db, id) {

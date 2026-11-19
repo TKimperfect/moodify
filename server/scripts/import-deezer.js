@@ -1,6 +1,6 @@
-// Imports real songs in seven languages (Malay, Mandarin, Cantonese,
-// Taiwanese Hokkien, Korean, Japanese, English) from Deezer playlists. Each
-// song gets the language it is really sung in (playlists mix languages).
+// Imports real songs from Deezer playlists in six languages (Malay, Mandarin,
+// Cantonese, Korean, Japanese, English). Each song gets the language it is
+// really sung in (playlists mix languages), e.g. Indonesian songs from Malay playlists.
 // Run from the "moodify" folder with:  npm run music:import-languages
 // By default it takes every song from the matching playlists (up to 10
 // playlists per search). Optional: a maximum per language and mood, e.g.
@@ -13,7 +13,7 @@ import { importDeezerCatalog } from '../src/services/music/deezerCatalog.js';
 import { saveCatalog } from './catalogStore.js';
 import { LANGUAGES } from '../src/data/taxonomy.js';
 import { describeChanges } from '../src/services/music/language.js';
-import { relabel } from './languageLabels.js';
+import { relabel, updateIsrcs } from './languageLabels.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const perMood = Number(process.argv[2]) || Infinity;
@@ -52,14 +52,16 @@ if (songs.length === 0) {
   process.exit(1);
 }
 
-const NAMES = { ...LANGUAGES, other: 'Other languages' };
+const NAMES = { ...LANGUAGES, instrumental: 'Instrumental', other: 'Other languages' };
 if (changes.length) {
   console.log(`\n${changes.length} songs are sung in another language than their playlist:`);
   for (const line of describeChanges(changes, NAMES).slice(0, 12)) console.log(`  ${line}`);
 }
 
-// Together with MuSe, so both use what the other knows about each artist.
-const together = relabel({ deezer: songs, muse: museSongs });
+// Together with MuSe, so both use what the other knows about each artist,
+// and with each song's ISRC (the country of its label).
+const isrcs = await updateIsrcs({ deezer: songs, muse: museSongs });
+const together = relabel({ deezer: songs, muse: museSongs, isrcs });
 const fresh = together.deezer;
 if (fresh.length < songs.length) console.log(`\n  ${songs.length - fresh.length} songs are already in MOODIFY from MuSe and keep their MuSe moods.`);
 
