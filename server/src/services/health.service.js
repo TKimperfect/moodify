@@ -1,17 +1,19 @@
 // Reports that the server is alive and where its data comes from.
+import { readFileSync } from 'node:fs';
 import { env } from '../config/env.js';
 import { songRepository } from '../repositories/song.repository.js';
 import { assistantStatus } from './assistant.service.js';
 import { providersStatus } from './music/music.service.js';
 
 const startedAt = Date.now();
+const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
 export async function getHealthStatus() {
   const database = await songRepository.status();
   return {
     status: 'ok',
     service: 'moodify-api',
-    version: '1.2.3',
+    version,
     environment: env.nodeEnv,
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
     timestamp: new Date().toISOString(),

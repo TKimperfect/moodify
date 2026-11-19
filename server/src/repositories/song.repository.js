@@ -198,6 +198,27 @@ function byIdFor(loaded) {
   return table;
 }
 
+// Songs per language and provider, counted once per loaded catalogue (Render
+// asks /api/health every few seconds, and counting 100,000 songs each time
+// would keep the small free server busy).
+const counted = new WeakMap();
+function countsFor(songs) {
+  let result = counted.get(songs);
+  if (!result) {
+    const byLanguage = {};
+    const byProvider = {};
+    for (const song of songs) {
+      const language = song.language ?? 'unknown';
+      const provider = song.provider ?? 'sample';
+      byLanguage[language] = (byLanguage[language] ?? 0) + 1;
+      byProvider[provider] = (byProvider[provider] ?? 0) + 1;
+    }
+    result = { by_language: byLanguage, by_provider: byProvider };
+    counted.set(songs, result);
+  }
+  return result;
+}
+
 export const songRepository = {
   async findAll() {
     return (await load()).songs;
@@ -220,8 +241,7 @@ export const songRepository = {
       configured: isSupabaseConfigured,
       source,
       songs: songs.length,
-      by_language: songs.reduce((counts, song) => ({ ...counts, [song.language ?? 'unknown']: (counts[song.language ?? 'unknown'] ?? 0) + 1 }), {}),
-      by_provider: songs.reduce((counts, song) => ({ ...counts, [song.provider ?? 'sample']: (counts[song.provider ?? 'sample'] ?? 0) + 1 }), {}),
+      ...countsFor(songs),
       problem: problem ?? note,
     };
   },
