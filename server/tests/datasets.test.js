@@ -319,7 +319,7 @@ test('language labels: artists, playlists and MuSe decide together', async () =>
     song('deezer-1', '稻香', 'Jay Chou', 'zh'),
     song('deezer-2', 'Mojito', 'Jay Chou', 'zh'), // same artist as a Chinese title
     song('deezer-3', 'Give Me Everything', 'Pitbull', 'zh'), // known from MuSe
-    song('deezer-4', 'Hype Boy', 'NewJeans', 'ko'),
+    song('deezer-4', 'Hype Boy', 'NewJeans', 'ko', { isrc: 'USA2P2230222' }), // HYBE's US label: Korean
     song('deezer-5', 'Clint Eastwood', 'Gorillaz', 'ja'),
   ];
   const muse = [song('deezer-5', 'Clint Eastwood', 'Gorillaz', 'en'), song('deezer-9', 'Hey Ya!', 'Pitbull', 'en')];

@@ -8,7 +8,7 @@ import { describeChanges } from '../src/services/music/language.js';
 import { readCatalog, relabel, updateIsrcs } from './languageLabels.js';
 import { saveCatalog } from './catalogStore.js';
 
-const NAMES = { ...LANGUAGES, instrumental: 'Instrumental', other: 'Other languages' };
+const NAMES = { ...LANGUAGES, instrumental: 'Instrumental', other: 'Other languages', unknown: 'Unknown language' };
 const deezer = await readCatalog('deezer-catalog');
 const muse = await readCatalog('muse-catalog');
 if (deezer.length + muse.length === 0) {

@@ -27,6 +27,21 @@ const setOf = (text) => new Set(text.split(/\s+/).filter(Boolean));
 // "Running Away (Acoustic Version / Non-Album Bonus Track)" -> "Running Away"
 const mainTitle = (title) => String(title ?? '').replace(/\([^)]*\)|\[[^\]]*\]/g, ' ').split(/\s[-–]\s/)[0];
 const count = (list, set) => list.filter((word) => set.has(word)).length;
+// Malay and Indonesian build words from a root: "merindukanmu" = me + rindu + kan + mu.
+const MALAY_PREFIXES = /^(?:memper|diper|meng|meny|mem|men|ber|ter|per|me|di|ke|se)/;
+const MALAY_SUFFIXES = /(?:kannya|kanlah|kanku|kanmu|annya|kan|nya|lah|kah|an|ku|mu)$/;
+function isMalayWord(word) {
+  if (MALAY_WORDS.has(word)) return true;
+  if (word.length < 6) return false;
+  const candidates = new Set();
+  const noSuffix = word.replace(MALAY_SUFFIXES, '');
+  for (const base of [word, noSuffix]) {
+    candidates.add(base.replace(MALAY_PREFIXES, ''));
+    candidates.add(base);
+  }
+  return [...candidates].some((root) => root !== word && root.length >= 4 && MALAY_WORDS.has(root));
+}
+const countMalay = (list) => list.filter(isMalayWord).length;
 export const artistKey = (name) => String(name ?? '').trim().toLowerCase();
 
 // Word lists. The Malay list includes the words that are common in the titles
@@ -73,24 +88,32 @@ const ENGLISH_WORDS = setOf(`
   we what when will with world yeah you you're your
 `);
 const OTHER_WORDS = setOf(`
-  alma amigo amor amore au auf aux avec avoir bailar belle beso besos bien bist c'est canción ce che coeur com
-  comme como con corazon corazón coração cuore cœur dans das dei del della delle der des dich die dos du día ein
-  eine el ela ele elle elles encore engel eres est esta está et eu fait fille garçon grand grande hast hasta
-  herz ich ihr il ils immer ist j'ai je jour kein keine l'amour las le leben les leur liebe los ma mais mein mes
-  meu mich minha mis mit moi mon monde mort mujer mundo nacht nada nicht noche non notte nous nuit nunca não oui
-  où para pas per petit petite plus por pour quand que qui quiero rien rêve rêves sa sans sono ta gente fin camino verano creo un saudade schön sem sich
-  siempre sobre soleil sonne sont sur t'aime tempo teu todo toi ton tout tu tudo tus uma una und une vida vie
-  vita você vous welt wie wieder wir yo zu être
+  adentro agora agua alles amanhã amigo amo amor amore amour ancora aqui au auf aux avec avoir bailar bambina
+  beijo beso besos bien bist c'est camino canción canzone ce cette che chez ciao ciel cielo coeur coisa com
+  comme como con corazon corazón coração cosa creo cuando cuore cœur dans das dei dein deine del della delle
+  demain der des dich dios doch dolce donde dos du día dónde ein eine einem einen el ela ele elles enfant engel
+  eres est esta está et eu fait fille fin frau garçon gehen gente giorno gli grazie hast hasta herz heute hier
+  homme ich ihr il ils immer insieme io isso ist j'ai j'suis j'te jahre jamais je jour kein keine kinder kommen
+  kommt l'amour las le leben les leur liebe los ma mais mann mein meine menina mes meu mich minha mis mit moi
+  mon monde morgen mort mujer mulher mundo mädchen nacht nada nein nella nicht nichts niente noche noite nossa
+  nosso nostra nostro notte nous nuit nunca não ohne ojos oui où para parce pareil parole pas per perché perdida
+  perdido petit petite por porque pour pourquoi quand que quella querer questa questo qui quiero ragazza rara
+  rien rêve rêves sa saudade saudades schwarz schwarzen schön sei sem sempre sento sera siamo sich siempre sobre
+  soleil solitudine sonho sonne sono sont sorte stunde sueño sueños sulla sur t'aime t'es ta tempo teu ti tiempo
+  tierra todo toi ton toujours tout tu tudo tuo tus tutti tutto tête uma un una und une unter uomo verano vida
+  vie ville vita você voglio vom votre vous vuoi warum welt wenn wie wieder wir y'a yo zeit zu zum zur zusammen
+  ça été être über
 `);
-// Spanish words that are also Malay, Indonesian or English words: they count half.
-const WEAK_OTHER_WORDS = setOf('mi sin dia re');
+// Words that are also Malay, Indonesian or English words or names ("Encore", "Die", "Bella"): they count half.
+const WEAK_OTHER_WORDS = setOf('mi sin dia re mas pra pro ella den dem mia mio donna bella bello femme notre grand grande non plus sans die alma elle belle encore');
 const otherWordCount = (list) => count(list, OTHER_WORDS) + count(list, WEAK_OTHER_WORDS) / 2;
+// Words used in one of the two only ("kau", "tak", "cinta"... are used in both).
 const INDONESIAN_ONLY = setOf(`
-  aja banget bareng bisa cewek cowok deh doang dong emang gak gimana gue kamu kangen kayak kok lo lu mau nggak
+  aja banget bareng bisa cewek cowok deh doang dong emang gak gimana gue karena kangen kayak kok lo lu nggak
   pacar sih udah
 `);
 const MALAYSIAN_ONLY = setOf(`
-  bagaimana boleh engkau hendak kau kerana kerna mahu sahaja sangat tak takkan
+  awak hendak kerana kerna mahu nak sahaja
 `);
 const JAPANESE_WORDS = setOf(`
   ai aki ame arigatou asa boku da dake de desu e egao fuyu ga hana haru hoshi ka kara kaze kimi kimochi koi
@@ -109,17 +132,157 @@ const VERSION_MARKS = [
   [/japanese (?:ver|version)|日本語/i, 'ja'],
   [/korean (?:ver|version)|한국어/i, 'ko'],
   [/english (?:ver|version)|eng ver/i, 'en'],
-  [/mandarin|國語|国语|\(國\)|chinese (?:ver|version)|中文版/i, 'zh'],
-  [/cantonese|粵語|粤语|\(粵\)|\(粤\)/i, 'yue'],
-  [/hokkien|台語|台语|閩南|闽南/i, 'other'], // Taiwanese Hokkien is not offered
+  // In brackets or as "... version", so titles like "Mandarin Beach" do not count.
+  [/[(\[（][^)\]）]*(?:mandarin|國語|国语|普通話|普通话)[^)\]）]*[)\]）]|(?:mandarin|chinese) (?:ver|version)|國語版|国语版|中文版|\(國\)/i, 'zh'],
+  [/[(\[（][^)\]）]*(?:cantonese|粵語|粤语)[^)\]）]*[)\]）]|cantonese (?:ver|version)|粵語版|粤语版|\((?:粵|粤|yue)\)/i, 'yue'],
+  [/[(\[（][^)\]）]*(?:hokkien|台語|台语|閩南語|闽南语)[^)\]）]*[)\]）]|hokkien (?:ver|version)|台語版|台语版/i, 'other'], // Taiwanese Hokkien is not offered
   [/motivational speech/i, 'en'],
+  // Just the language in brackets: "The End (Korean)".
+  [/[(\[（](?:korean|한국어)[)\]）]/i, 'ko'],
+  [/[(\[（](?:japanese|日本語)[)\]）]/i, 'ja'],
+  [/[(\[（]english[)\]）]/i, 'en'],
 ];
+
+// Artists the rules above cannot place, checked by hand (web searches in
+// November 2026, or well-known artists). A value with a playlist applies only
+// to songs found in that playlist, for names that other artists share.
+const CHECKED_ARTISTS = {
+  // In Japanese playlists, but not sung in Japanese
+  'la sad': 'other', // Italian band
+  kamaitachi: { language: 'other', playlist: 'ja' }, // the Brazilian rapper (not the Japanese band)
+  rattlehead: 'en', // American thrash metal band
+  'illusion force': 'en', // Japanese band, English lyrics
+  'foreground eclipse': 'en', // Japanese band, English lyrics
+  metalucifer: 'en', // Japanese band, English lyrics
+  'nattalia sarria': 'other', // city pop covers in Spanish
+  kordhell: 'en', // phonk with English vocal samples
+  'derek fiechter': 'instrumental',
+  'brandon fiechter': 'instrumental',
+  stapes: 'instrumental',
+  'friedrich habetler': 'instrumental', // piano covers
+  'samuel kim': 'instrumental', // orchestral covers
+  'chasing mirrors': 'instrumental',
+  kicktracks: 'instrumental', // stock music
+  'mc orsen': 'instrumental', // drift phonk
+  nueki: 'instrumental',
+  'phonk walker': 'instrumental',
+  'ghostface playa': 'instrumental',
+  moondeity: 'instrumental',
+  'suave lee': 'instrumental',
+  xxanteria: 'other', // Brazilian funk
+  'dj ikeraus': 'other',
+  bellyjay: 'other',
+  // Checked: sung in Japanese or Korean, though nothing in the song data says so
+  garnidelia: 'ja',
+  necronomidol: 'ja',
+  'scarlet valse': 'ja', // visual kei band
+  'mai yajima': 'ja',
+  akano: 'ja', // Japanese anime cover singer
+  yurisa: 'ja',
+  rainych: 'ja', // sings Japanese covers
+  'arise in stability': 'ja', // Japanese lyrics
+  'aunt sally': 'ja',
+  'michiya mihashi': 'ja',
+  badcupid: 'ko',
+  'kuang program': 'ko',
+  // Western bands singing in English that nothing in the song data shows
+  'michael learns to rock': 'en',
+  'hong kong syndikat': 'en',
+  'kurt maloo': 'en',
+  double: { language: 'en', playlist: 'yue' }, // the Swiss band
+  'the joubert singers': 'en',
+  'killswitch engage': 'en',
+  'against the current': 'en',
+  'vanilla sky': { language: 'en', playlist: 'ms' }, // the Italian band
+  'kowloon cowboy': 'en',
+  // In Korean playlists, but sung in English
+  '...whatever that means': 'en', // Seoul punk band with an international line-up
+  hybs: 'en', // Thai duo singing in English
+  'hannah bahng': 'en', // Australian singer
+  'k/da': 'en',
+  'jesse barrera': 'en',
+  'resist and exist': 'en',
+  // Chinese playlists
+  'bliss-illusion': 'zh', // Beijing band, Chinese lyrics
+  hiperson: 'zh', // Chengdu band, Chinese lyrics
+  zuriaake: 'zh', // lyrics from classical Chinese poetry
+  'joi cai chun jia': 'zh', // Joi Chua, Singaporean Mandopop
+  'tengger cavalry': 'other', // Mongolian
+  'nine treasures': 'other',
+  suld: 'other',
+  'ego fall': 'other', // Inner Mongolia, sings in Mongolian and Mandarin
+  'be persecuted': 'zh', // Nanchang black metal, Chinese lyrics
+  holyarrow: 'zh', // Xiamen black metal about Chinese history
+  'vengeful spectre': 'zh', // Guangdong black metal about Chinese folklore
+  nihility: 'zh', // Changchun metal band, Chinese song titles
+  'gao qi & overload': 'zh', // Beijing rock band Overload
+  // Korean playlists
+  'j rabbit': 'ko', // Korean acoustic duo
+  'food for worms': 'en', // Daegu punk band with an American singer
+  'dpr ian': 'en',
+  jambinai: 'instrumental', // Korean post-rock
+  // Japanese playlists
+  'elijah nang': 'instrumental', // London lo-fi producer
+  'jt music': 'en', // American rap group
+  shiitaki: 'instrumental', // lo-fi
+  nogymx: 'instrumental',
+  mujo: 'instrumental',
+  'eddie van der meer': 'instrumental', // guitar covers
+  'hikaru station': 'en', // sings English versions of anime songs
+  'takamachi walk': 'en', // Touhou metalcore circle from Atlanta
+  'ted park': 'en', // American singer
+  // Western artists the word lists place wrongly
+  'astor piazzolla': 'instrumental',
+  vangelis: 'instrumental',
+  'ólafur arnalds': 'instrumental',
+  'víkingur ólafsson': 'instrumental',
+  'marc antoine': 'instrumental',
+  'penguin cafe orchestra': 'instrumental',
+  'year of no light': 'instrumental',
+  'venetian snares': 'instrumental',
+  colleen: 'instrumental',
+  'the hsu-nami': 'instrumental',
+  'pet shop boys': 'en',
+  'warren zevon': 'en',
+  'the avett brothers': 'en',
+  'vivian stanshall': 'en',
+  "gigi d'agostino": 'en',
+  'neto reyno': 'other', // Mexican rap
+  'mr. yosie locote': 'other',
+  'kany garcía': 'other', // Puerto Rico, Spanish
+  'luedji luna': 'other', // Brazil
+  'humood alkhudher': 'other', // Kuwaiti nasheed, Arabic
+  // Moluccan (Ambon) singers in Malay playlists: Indonesian
+  'antonny rangkoly': 'id',
+  'benny fasak': 'id',
+  'kevins syahailatua': 'id',
+  'lady soul & suara maluku band': 'id',
+  'moluccan moods orchestra': 'id',
+  bg: { language: 'id', playlist: 'ms' },
+  // Malaysian singers released without Malaysian codes
+  'amy search': 'ms',
+  'ayda jebat': 'ms',
+  'jalil hamid': 'ms',
+  'aisyah aziz': 'ms',
+  'liyana jasmay': 'ms',
+  'firdaus rahmat': 'ms',
+  'ronnie hussein': 'ms',
+};
+function checkedLanguage(song) {
+  const entry = CHECKED_ARTISTS[artistKey(song.artist)];
+  if (!entry) return null;
+  if (typeof entry === 'string') return entry;
+  return song.foundIn.includes(entry.playlist) ? entry.language : null;
+}
 const versionMark = (title) => VERSION_MARKS.find(([pattern]) => pattern.test(String(title ?? '')))?.[1] ?? null;
 
 // Japanese written in Latin letters ("Sonohiwa Kanarazu Kuru").
 const ROMAJI_WORD = /^(?:(?:[kgsztdnhbpmrwfjv]|ky|gy|sh|ch|ts|ny|hy|by|py|my|ry|j)?[aiueo]|n|[kstpgdbmc](?=[kstpgdbmc]))+$/;
-function isRomaji(title) {
+// strict: several words, one of them a common Japanese word ("Ai no Uta"), so
+// that English words shaped like Japanese ("Attitude", "Baddie") do not count.
+function isRomaji(title, { strict = false } = {}) {
   const list = words(mainTitle(title)).filter((word) => word.length > 1 || word === 'e');
+  if (strict && (list.length < 2 || !list.some((word) => JAPANESE_WORDS.has(word)))) return false;
   if (list.length < 2) return list.length === 1 && list[0].length >= 6 && ROMAJI_WORD.test(list[0]) && !ENGLISH_WORDS.has(list[0]);
   const romaji = list.filter((word) => ROMAJI_WORD.test(word));
   return (
@@ -127,6 +290,14 @@ function isRomaji(title) {
     (list.some((word) => JAPANESE_WORDS.has(word)) || romaji.some((word) => word.length >= 5)) &&
     count(list, ENGLISH_WORDS) <= Math.floor(list.length / 3)
   );
+}
+
+// Mandarin written in pinyin ("Yi Hou Bie Zuo Peng You"), as Deezer often shows Chinese titles.
+const PINYIN_WORD =
+  /^(?:[bpmfdtnlgkhjqxrzcsyw]|zh|ch|sh)?(?:iang|iong|uang|ueng|ang|eng|ing|ong|ian|iao|uai|uan|van|ai|ei|ao|ou|an|en|in|un|vn|er|ia|ie|iu|ua|uo|ui|ue|ve|a|o|e|i|u|v)$/;
+function isPinyin(title) {
+  const list = words(mainTitle(title));
+  return list.length >= 2 && list.every((word) => PINYIN_WORD.test(word)) && count(list, ENGLISH_WORDS) <= Math.floor(list.length / 3);
 }
 
 // Language from the writing system alone; null for the Latin alphabet.
@@ -143,7 +314,8 @@ const scriptOf = (...texts) => scriptLanguage(texts.filter(Boolean).join(' '), '
 
 // ---- ISRC: country and label ----
 const ASIAN_COUNTRIES = { JP: 'ja', KR: 'ko', KS: 'ko', HK: 'yue', MO: 'yue', TW: 'zh', CN: 'zh', MY: 'ms', ID: 'id' };
-const OTHER_ASIAN_COUNTRIES = new Set('TH VN IN PK BD LK PH TR RU UA IL AE SA EG IR KZ MN NP MM KH'.split(' '));
+// (AE is left out: distributors in the Emirates release music from everywhere.)
+const OTHER_ASIAN_COUNTRIES = new Set('TH VN IN PK BD LK PH TR RU UA IL SA EG IR KZ MN NP MM KH'.split(' '));
 const ENGLISH_COUNTRIES = new Set(['US', 'GB', 'UK', 'CA', 'AU', 'IE', 'NZ']);
 // Labels (first 5 letters of the ISRC) outside Asia that release songs in one
 // Asian language, e.g. JYP's and HYBE's US labels (Korean). They count only for
@@ -185,7 +357,8 @@ export function isrcSignal(isrc, foundIn = [], distributors = new Set()) {
   const country = code.slice(0, 2);
   if (LABEL_LANGUAGES[prefix]) return foundIn.includes(LABEL_LANGUAGES[prefix]) ? { kind: 'asia', language: LABEL_LANGUAGES[prefix] } : { kind: null };
   if (LOFI_LABELS.has(prefix)) return { kind: 'lofi' };
-  if (code.startsWith('TCJP')) return { kind: 'asia', language: 'ja' }; // TuneCore Japan
+  // TuneCore Japan, also used by Chinese and Malaysian indie bands.
+  if (code.startsWith('TCJP')) return foundIn.some((language) => ['zh', 'yue', 'ms'].includes(language)) ? { kind: null } : { kind: 'asia', language: 'ja' };
   if (ASIAN_COUNTRIES[country]) return { kind: 'asia', language: ASIAN_COUNTRIES[country] };
   if (isDistributorCountry(country) || distributors.has(prefix)) return { kind: null };
   if (country === 'SG') return { kind: 'singapore', country };
@@ -203,7 +376,7 @@ function artistProfiles(songs, signals) {
   const profiles = new Map();
   for (const song of songs) {
     const key = artistKey(song.artist);
-    const profile = profiles.get(key) ?? { songs: 0, votes: {}, playlists: {}, countries: {}, other: 0, english: 0, albumInstrumental: 0, hongKong: { yue: 0, zh: 0 }, sure: 0 };
+    const profile = profiles.get(key) ?? { songs: 0, votes: {}, playlists: {}, countries: {}, other: 0, english: 0, albumInstrumental: 0, hongKong: { yue: 0, zh: 0 }, sure: 0, chinese: 0, singapore: 0, malay: 0, englishLabel: 0 };
     profiles.set(key, profile);
     profile.songs += 1;
     const { foundIn } = song;
@@ -212,6 +385,8 @@ function artistProfiles(songs, signals) {
     if (script) add(profile.votes, script, 3);
     const signal = signals.get(song.id);
     if (script || signal.kind === 'asia') profile.sure += 1; // more than a playlist says where the artist is from
+    // Anything besides a playlist that says the artist sings in Chinese.
+    if (script === 'han' || (signal.kind === 'asia' && CHINESE.includes(signal.language)) || isPinyin(song.title)) profile.chinese += 1;
     if (signal.kind === 'asia') {
       // Hong Kong, Taiwan and China labels also release Korean and Japanese
       // music there: they count less for songs not in a Chinese playlist.
@@ -219,16 +394,20 @@ function artistProfiles(songs, signals) {
       add(profile.votes, signal.language, chineseLabelOnly ? 0.5 : 2);
       add(profile.countries, signal.language, 1);
     }
-    if (signal.kind === 'english') add(profile.votes, 'en', 1);
+    if (signal.kind === 'english') {
+      add(profile.votes, 'en', 1);
+      profile.englishLabel += 1;
+    }
     if (signal.kind === 'western') add(profile.votes, 'west', 1);
     if (signal.kind === 'other-asia') add(profile.votes, 'other', 1);
-    for (const language of foundIn) add(profile.votes, language === 'muse' ? 'en' : language, language === 'muse' ? 1 : 0.5);
+    if (signal.kind === 'singapore') profile.singapore += 1;
     const titleWords = words(mainTitle(song.title));
     const english = count(titleWords, ENGLISH_WORDS);
-    const malay = count(titleWords, MALAY_WORDS);
-    if (!english && otherWordCount(titleWords) >= 1) profile.other += 1;
+    const malay = countMalay(titleWords);
+    if (!english && (otherWordCount(titleWords) >= 1 || ACCENTS.test(mainTitle(song.title)))) profile.other += 1;
     if (english) profile.english += 1;
     if (malay && malay > english && (foundIn.includes('ms') || malay >= 2)) add(profile.votes, 'ms', 2);
+    if (malay && malay >= english) profile.malay += 1;
     if (INSTRUMENTAL_NAME.test(song.album ?? '')) profile.albumInstrumental += 1;
     // Hong Kong labels release Cantonese and Mandarin songs: which playlists hold this artist's?
     if (String(song.isrc ?? '').toUpperCase().startsWith('HK') && !foundIn.includes('muse')) {
@@ -244,6 +423,18 @@ function artistProfiles(songs, signals) {
 // language unknown (many European artists sing in English).
 function homeLanguage(profile) {
   const votes = { ...profile.votes };
+  // Playlists: MuSe counts as English. Chinese playlists count only when
+  // something else says the artist sings in Chinese (they also hold French
+  // rap, Western hits and English songs by Asian artists).
+  // Malay playlists likewise need Malay or Indonesian words in a title, or a
+  // Malaysian, Indonesian or Singapore label.
+  const malayEvidence = profile.malay || profile.singapore || profile.countries.ms || profile.countries.id;
+  for (const [language, times] of Object.entries(profile.playlists)) {
+    if (language === 'muse') add(votes, 'en', times);
+    else if (CHINESE.includes(language) && !profile.chinese) continue;
+    else if (language === 'ms' && !malayEvidence) continue;
+    else add(votes, language, times * 0.5);
+  }
   if (votes.han) {
     const han = votes.han;
     delete votes.han;
@@ -253,11 +444,16 @@ function homeLanguage(profile) {
     else add(votes, (votes.yue ?? 0) > (votes.zh ?? 0) ? 'yue' : 'zh', han);
   }
   const best = top(votes);
-  if (best === 'west') return profile.other >= 2 && profile.other >= profile.english ? 'other' : 'west';
+  const foreign = profile.other >= 2 && profile.other >= profile.english;
+  if (best === 'west' || ((best === null || best === 'en') && !profile.playlists.muse)) return foreign ? 'other' : best;
   return best;
 }
 
-function malayOrIndonesian(profile, title, fallback) {
+// When neither the title nor the artist's labels tell: Malaysian
+// singers nearly always have Malaysian (MY) or Singapore (SG) codes; Malay
+// playlist songs without any are mostly by Indonesian singers released
+// through international distributors.
+function malayOrIndonesian(profile, title) {
   const list = words(mainTitle(title));
   const indonesian = list.some((word) => INDONESIAN_ONLY.has(word));
   const malaysian = list.some((word) => MALAYSIAN_ONLY.has(word));
@@ -265,8 +461,8 @@ function malayOrIndonesian(profile, title, fallback) {
   if (malaysian && !indonesian) return 'ms';
   const { id = 0, ms = 0 } = profile.countries;
   if (id > ms) return 'id';
-  if (ms > id) return 'ms';
-  return fallback;
+  if (ms > id || profile.singapore) return 'ms';
+  return 'id';
 }
 
 // One song. Returns [language, reason].
@@ -275,7 +471,7 @@ function decide(song, profile, signal) {
   const home = profile.home;
   const titleWords = words(mainTitle(title));
   const english = count(titleWords, ENGLISH_WORDS);
-  const malay = count(titleWords, MALAY_WORDS);
+  const malay = countMalay(titleWords);
   const other = otherWordCount(titleWords) >= 1;
   const accents = ACCENTS.test(mainTitle(title));
   let { kind } = signal;
@@ -291,6 +487,8 @@ function decide(song, profile, signal) {
   if (share >= enough) return ['instrumental', 'keyword'];
   const mark = versionMark(title);
   if (mark) return [mark, 'marker'];
+  const checked = checkedLanguage(song);
+  if (checked) return [checked, 'checked'];
 
   const chinese = (fromIsrc = null) => {
     const found = ['yue', 'zh'].filter((language) => foundIn.includes(language));
@@ -325,24 +523,42 @@ function decide(song, profile, signal) {
   if (kind === 'asia') {
     if (CHINESE.includes(country)) return [chinese(country), 'isrc'];
     if (country === 'ms' || country === 'id') return english >= 2 && malay === 0 ? ['en', 'isrc+title'] : [country, 'isrc'];
-    if (country === 'ko' && home === 'ja') return ['ja', 'artist'];
     return [country, 'isrc']; // e.g. a K-pop group's Japanese release: Japanese
   }
   if (kind === 'other-asia') return [english ? 'en' : 'other', 'isrc'];
-  if (kind === 'singapore' && (foundIn.includes('ms') || malay)) return [malayOrIndonesian(profile, title, 'ms'), 'isrc'];
+  if (kind === 'singapore' && (foundIn.includes('ms') || malay)) return [malayOrIndonesian(profile, title), 'isrc'];
   // A real Western label and no Asian playlist: trust it over an artist with the same name.
   if (kind === 'english' && onlyIn(foundIn, ['en', 'muse'])) return [(other || accents) && !english ? 'other' : 'en', 'isrc'];
   // Only playlists point to an Asian language, but the title is French, Spanish...
   if (!profile.sure && !english && !malay && (other || accents) && home !== 'en') return ['other', 'words'];
-  if (home === 'ko' || home === 'ja') return [home === 'ko' && isRomaji(title) ? 'ja' : home, 'artist'];
+  // A song from a Western label (not a distributor) with a Latin title, not in a
+  // playlist of the artist's language: another artist with the same name
+  // (Gala, LISA / LiSA), or an Asian act's English release found in English playlists.
+  const asianName = HANGUL.test(song.artist) || KANA.test(song.artist) || HAN.test(song.artist);
+  const homePlaylist = CHINESE.includes(home) ? foundIn.some((language) => CHINESE.includes(language)) : foundIn.includes(home);
+  if ((kind === 'english' || kind === 'western') && [...CHINESE, 'ko', 'ja'].includes(home) && !homePlaylist && !isPinyin(title) && !isRomaji(title) && !asianName) {
+    return [(other || accents) && !english ? 'other' : 'en', 'isrc'];
+  }
+  if (home === 'ko' || home === 'ja') {
+    if (home === 'ko' && isRomaji(title, { strict: true })) return ['ja', 'romaji'];
+    if (home === 'ja' && isRomaji(title) && words(mainTitle(title)).length >= 2) return ['ja', 'romaji'];
+    // Only playlists say so: nothing tells what this artist sings in.
+    return profile.sure ? [home, 'artist'] : ['unknown', 'no evidence'];
+  }
   if (CHINESE.includes(home)) return [chinese(), 'artist'];
-  if (home === 'ms' || home === 'id') return english >= 2 && malay === 0 ? ['en', 'title'] : [malayOrIndonesian(profile, title, home), 'artist'];
-  if (malay >= 1 && malay > english && (foundIn.includes('ms') || malay >= 2) && !other) return [malayOrIndonesian(profile, title, 'ms'), 'words'];
+  if (!CHINESE.includes(home) && isPinyin(title) && foundIn.some((language) => CHINESE.includes(language))) return [chinese(), 'pinyin'];
+  if (home === 'ms' || home === 'id') return english >= 2 && malay === 0 ? ['en', 'title'] : [malayOrIndonesian(profile, title), 'artist'];
+  if (malay >= 1 && malay > english && (foundIn.includes('ms') || malay >= 2) && !other) return [malayOrIndonesian(profile, title), 'words'];
   if (home === 'other' && !english) return ['other', 'artist'];
   if (other && !english) return ['other', 'words'];
   if (accents && !english && !malay) return ['other', 'words'];
   if (isRomaji(title) && foundIn.includes('ja')) return ['ja', 'romaji'];
-  return ['en', 'default'];
+  // English: the artist is known from English playlists, MuSe (Western
+  // listeners) or an English-speaking label. Otherwise nothing tells.
+  if (profile.playlists.en || profile.playlists.muse || profile.englishLabel) return ['en', 'default'];
+  // A European label and an English title (e.g. Michael Learns To Rock, Denmark).
+  if (english && (kind === 'western' || profile.votes.west)) return ['en', 'title'];
+  return ['unknown', 'no evidence'];
 }
 
 // A quick guess for one song on its own (used while importing; the full
@@ -371,15 +587,17 @@ export function labelLanguages(songs, { isrcs = new Map(), museIds = new Set(), 
   const profiles = artistProfiles(all, signals);
   const changes = [];
   const reasons = {};
+  const reasonById = new Map();
   const labelled = prepared.map(({ foundIn, isrc: _isrc, ...song }) => {
     const [language, reason] = decide({ ...song, foundIn }, profiles.get(artistKey(song.artist)), signals.get(song.id));
     reasons[reason] = (reasons[reason] ?? 0) + 1;
+    reasonById.set(song.id, reason);
     if (song.language && song.language !== language) changes.push({ id: song.id, from: song.language, to: language, example: `${song.artist} – ${song.title}` });
     const playlists = foundIn.filter((item) => item !== 'muse');
     const { found_in: _saved, foundIn: _given, ...rest } = song;
     return playlists.length ? { ...rest, language, found_in: playlists } : { ...rest, language };
   });
-  return { songs: labelled, changes, reasons };
+  return { songs: labelled, changes, reasons, reasonById };
 }
 
 // "Mandarin → English: 120 (e.g. Pitbull – Give Me Everything)" lines.

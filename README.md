@@ -175,9 +175,12 @@ Playlists mix languages (a "Chinese" playlist can hold French rap, a "Korean" on
 2. **Marks in the title**: "(Japanese Ver.)", "(國)", "(粵語)"…
 3. **Writing**: Korean, Japanese, Chinese, Thai, Cyrillic… in the title.
 4. **ISRC**, the international code of every recording (`server/src/services/music/isrc.js`). Its first two letters are the country of the label: JP, KR, HK, TW, MY, ID… Some labels outside Asia are known to release Korean songs (JYP's and HYBE's US labels); codes from distributors that anyone can use (TuneCore, DistroKid, CD Baby…) say nothing. A K-pop group's release with a Japanese code is their Japanese version. A Hong Kong code is Cantonese unless the song is in a Mandarin playlist (except for singers whose songs are mostly in Cantonese playlists).
-5. **The artist**: what all of the artist's songs say together.
-6. **Words**: Malay words (Indonesian when the artist's label is Indonesian), French / Spanish / German… words and accents ("Other languages").
-7. Otherwise **English**.
+5. **The artist**: what all of the artist's songs say together. Chinese playlists count only when something else says the artist sings in Chinese (Chinese characters, a Hong Kong / Taiwan / China label, a pinyin title such as "Yi Hou Bie Zuo Peng You"), and Malay playlists only with Malay or Indonesian words in a title or a Malaysian / Indonesian / Singapore label: both also hold French rap and Western hits. A song from a Western label with a Latin title that is not in a playlist of the artist's language belongs to another artist with the same name (Gala, LISA / LiSA) and follows its label.
+6. **Words**: Malay and Indonesian words (also built from a root: "merindukanmu" = me + rindu + kan + mu), French / Spanish / German… words and accents ("Other languages"). Malay or Indonesian: the artist's labels (MY, SG or ID) decide; words used only in Malaysia ("mahu", "sahaja", "kerana") or only in Indonesia ("nggak", "banget", "karena") also tell; without either it is Indonesian, because Malaysian singers nearly always have Malaysian codes while many Indonesian singers release through international distributors.
+7. **English** when the artist is known from English playlists, MuSe or an English-speaking label, or has a European label and an English title.
+8. Otherwise **Unknown language**: nothing in the song data (nor a web search) tells. These songs are recommended when no language is chosen, never when one is, and Discover lists them under "Unknown".
+
+Some artists cannot be placed by these rules (a Japanese band singing in English, an Italian band in a Japanese playlist, Malaysian singers without Malaysian codes...). Those with the most songs were checked by hand with a web search and are listed in `CHECKED_ARTISTS` in `language.js`; add an artist there to correct its language.
 
 The ISRCs are looked up on Deezer once (one request per song, about 2.5 hours for 58,000 songs; MuSe needs one song per artist) and kept in `server/data/isrc-cache.json`. The import prints how many songs got another language, with examples. Songs that also came from MuSe keep their MuSe moods.
 

@@ -217,7 +217,7 @@ export async function importMuse({ perMood = Infinity, csvText, progress = new M
     if (track?.id) {
       // MuSe is mostly English-language music; "npm run music:relabel-languages"
       // refines this with what the other imports know about each artist.
-      const language = detectLanguage({ title: String(track.title ?? ''), artist: String(track.artist?.name ?? row.artist) });
+      const language = detectLanguage({ title: String(track.title ?? ''), artist: String(track.artist?.name ?? row.artist), foundIn: ['muse'] });
       stats.found += 1;
       perMoodKept.set(mood, (perMoodKept.get(mood) ?? 0) + 1);
       song = {

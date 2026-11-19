@@ -46,7 +46,7 @@ export async function getDiscover() {
     newest: [...all].sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || byPopularity(a, b)).slice(0, 8),
     genres: Object.entries(GENRES).map(([id, label]) => ({ id, label, count: count('genres', id) })),
     moods: MOOD_IDS.map((id) => ({ id, count: count('moods', id) })),
-    languages: [...Object.entries(LANGUAGES), ['instrumental', 'Instrumental'], ['other', 'Other languages']].map(([id, label]) => ({
+    languages: [...Object.entries(LANGUAGES), ['instrumental', 'Instrumental'], ['other', 'Other languages'], ['unknown', 'Unknown language']].map(([id, label]) => ({
       id,
       label,
       count: all.filter((song) => song.language === id).length,

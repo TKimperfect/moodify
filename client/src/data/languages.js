@@ -12,9 +12,10 @@ export const LANGUAGES = [
 export const languageLabel = (id) => {
   if (id === 'instrumental') return 'Instrumental';
   if (id === 'other') return 'Other languages';
+  if (id === 'unknown') return 'Unknown language';
   const language = LANGUAGES.find((item) => item.id === id);
   return language ? (language.native === language.label ? language.label : `${language.native} ${language.label}`) : id;
 };
 
-const SHORT = { instrumental: 'Instrumental', other: 'Other' };
+const SHORT = { instrumental: 'Instrumental', other: 'Other', unknown: 'Unknown' };
 export const languageShort = (id) => SHORT[id] ?? LANGUAGES.find((item) => item.id === id)?.native ?? id;

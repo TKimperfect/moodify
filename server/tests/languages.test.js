@@ -100,10 +100,21 @@ test('each song gets the language it is sung in, not its playlist\'s', async () 
   assert.equal(scriptLanguage('사랑해 아이유'), 'ko');
   assert.equal(scriptLanguage('残酷な天使のテーゼ'), 'ja');
   assert.equal(scriptLanguage('Dynamite BTS'), null);
-  assert.equal(detectLanguage({ title: 'Sedih', artist: 'Siti Nurhaliza', foundIn: ['ms'] }), 'ms');
-  assert.equal(detectLanguage({ title: 'Rindu Kau', artist: 'Man Bai', foundIn: ['en'] }), 'ms'); // Malay words
+  assert.equal(detectLanguage({ title: 'Sedih', artist: 'Siti Nurhaliza', foundIn: ['ms'], isrc: 'MYUM71400048' }), 'ms');
+  assert.equal(detectLanguage({ title: 'Rindu Kau', artist: 'Man Bai', foundIn: ['en'], isrc: 'SGB501234567' }), 'ms'); // Malay words, Singapore label
+  // Malay words, no Malaysian or Indonesian label: mostly Indonesian singers on international distributors.
+  assert.equal(detectLanguage({ title: 'Merindukanmu', artist: 'Dash Uciha', foundIn: ['ms'], isrc: 'QZHN31234567' }), 'id');
+  assert.equal(detectLanguage({ title: 'Aku Mahu Pulang', artist: 'Someone', foundIn: ['ms'], isrc: 'QZHN31234567' }), 'ms'); // Malaysian word
+  // An English title found only in a Malay playlist, nothing else Malay about it.
+  assert.equal(detectLanguage({ title: 'Dead Man Walking', artist: 'Against The Current', foundIn: ['ms'], isrc: 'QM24S2602482' }), 'en');
+  assert.equal(detectLanguage({ title: 'Mandarin Beach', artist: 'Ilkae', foundIn: ['en'] }), 'en'); // not a version mark
+  assert.equal(detectLanguage({ title: 'Wu Jian Dao (Yue)', artist: 'Andy Lau', foundIn: ['zh'] }), 'yue');
   assert.equal(detectLanguage({ title: 'Je te laisserai des mots', artist: 'Patrick Watson', foundIn: ['ja'] }), 'other');
-  assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'] }), 'ko'); // unknown artist: the playlist decides
+  // Nothing but a Korean playlist: the language is unknown (with HYBE's label code it is Korean).
+  assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'] }), 'unknown');
+  assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'], isrc: 'USA2P2230222' }), 'ko');
+  assert.equal(detectLanguage({ title: 'Dystopia', artist: 'Release Hallucination', foundIn: ['ja'], isrc: 'QZDY41666857' }), 'unknown'); // distributor code
+  assert.equal(detectLanguage({ title: 'Hey Jude', artist: 'The Beatles', foundIn: ['muse'] }), 'en'); // known from MuSe
   assert.equal(detectLanguage({ title: 'Spa Relaxation', artist: 'Asian Zen Spa Music Meditation', foundIn: ['zh'] }), 'instrumental');
   assert.equal(detectLanguage({ title: 'Rooftop (Japanese ver.)', artist: 'N.Flying', foundIn: ['ko'] }), 'ja');
   const { songs } = labelLanguages([{ id: 'deezer-1', title: 'Give Me Everything', artist: 'Pitbull', foundIn: ['zh'] }], { extraWesternArtists: ['Pitbull'] });
@@ -125,13 +136,24 @@ test('the ISRC (country of the label) tells the language', async () => {
     song('a9', 'Let Her Go', 'Passenger', ['ms'], 'GBMQN1100004'), // British label in a Malay playlist
     song('a10', 'Ma belle vie', 'joysad', ['ja'], 'FR6P12100920'), // French rap in a Japanese playlist
     song('a11', 'Cherry Tree', 'Arrythm', ['ja'], 'QZNWV2184354', 'Japanese Lofi Journey'), // lo-fi beats
-    song('a12', 'Death Contract', 'Black Kirin', ['zh'], 'QZHN31687288'), // distributor: the playlist decides
-    song('a13', 'Teh Hijau', 'Tulus', ['ms'], 'FR6V82272634'),
+    song('a12', 'Superstar', 'Jul', ['zh'], 'FR96X2202747'), // French rap in a Chinese playlist: nothing else says Chinese...
+    song('a14', 'Ma belle', 'Jul', ['zh'], 'FRX282296384'), // ...and his titles are French
+    song('a18', 'Irréversible', 'Jul', ['zh'], 'FR8Y72100223'),
+    song('a15', 'Yi Hou Bie Zuo Peng You', 'Eric Chou', ['zh'], 'QZHN31687288'), // pinyin title
+    song('a16', 'Freed From Desire', 'Gala', ['en'], 'ITA179700143'), // Italian singer...
+    song('a17', '追梦赤子心', 'Gala', ['zh'], 'CNA501600001'), // ...and a Chinese band with the same name
+    song('a13', 'Teh Hijau', 'Tulus', ['ms'], 'FR6V82272634'), // Indonesian singer, French distributor
+    song('a19', 'Chinese Football', 'Chinese Football', ['zh'], 'TCJPU2000001'), // TuneCore Japan, Chinese band: not Japanese, but unknown
+    song('a20', 'FXCK UP THE WORLD', 'LISA', ['ko'], 'USRC12500001'), // BLACKPINK's Lisa on a US label...
+    song('a21', 'unravel', 'LiSA', ['ja'], 'JPU901400001'), // ...and LiSA from Japan
+    song('a22', 'unravel', 'LiSA', ['ja'], 'JPU901400002'),
+    song('a23', 'ATTITUDE', 'IVE', ['ko'], 'QMFMF2500001'), // looks like Japanese in Latin letters, but is not
+    song('a24', 'LOVE DIVE', 'IVE', ['ko'], 'KRA302200001'),
   ]);
   const language = Object.fromEntries(songs.map((item) => [item.id, item.language]));
   assert.deepEqual(language, {
     a1: 'ko', a2: 'ja', a3: 'ja', a4: 'yue', a5: 'yue', a6: 'yue', a7: 'id', a8: 'ms',
-    a9: 'en', a10: 'other', a11: 'instrumental', a12: 'zh', a13: 'ms',
+    a9: 'en', a10: 'other', a11: 'instrumental', a12: 'other', a13: 'id', a14: 'other', a15: 'zh', a16: 'en', a17: 'zh', a18: 'other', a19: 'unknown', a20: 'en', a21: 'ja', a22: 'ja', a23: 'ko', a24: 'ko',
   });
   assert.equal(isrcSignal('TCJPP2161270').language, 'ja'); // TuneCore Japan
   assert.equal(isrcSignal('US5TA1800093', ['en']).kind, null); // JYP's US label also releases Western songs
@@ -183,7 +205,8 @@ test('the Deezer import builds language-tagged songs per mood', async () => {
   assert.equal(eason.preview_url, null); // fetched fresh when played
   assert.equal(eason.artwork_url, 'https://cdn/101.jpg');
   assert.ok(eason.effects.includes('comfort'));
-  assert.equal(songs.find((item) => item.id === 'deezer-201').language, 'ko');
+  // A Latin title in a Korean playlist: unknown until its ISRC is looked up (the import does that next).
+  assert.equal(songs.find((item) => item.id === 'deezer-201').language, 'unknown');
 });
 
 test('choosing languages filters recommendations and explains it', () => {
@@ -290,7 +313,7 @@ test('profiles and sessions accept only known languages', async () => {
 
 test('Discover lists languages and search filters by language', async () => {
   const discover = await (await fetch(`${baseUrl}/api/songs/discover`)).json();
-  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'yue', 'ko', 'ja', 'instrumental', 'other']);
+  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'yue', 'ko', 'ja', 'instrumental', 'other', 'unknown']);
   assert.equal(discover.languages.find((item) => item.id === 'instrumental').count, 70);
   const malay = await (await fetch(`${baseUrl}/api/songs?language=ms`)).json();
   assert.equal(malay.count, 0);
@@ -311,7 +334,7 @@ test('the import reports which searches it tried', async () => {
 test('without a limit, whole playlists are read page by page', async () => {
   const { songs } = await importDeezerCatalog({ languages: ['ko'] });
   // The pretend Korean playlist has 2 songs; the Japanese one is labelled Japanese.
-  assert.deepEqual(songs.map((item) => [item.id, item.language]), [['deezer-201', 'ko'], ['deezer-202', 'ja']]);
+  assert.deepEqual(songs.map((item) => [item.id, item.language]), [['deezer-201', 'unknown'], ['deezer-202', 'ja']]);
 });
 
 test('the Deezer import: an artist known from Western music with a Latin title is English', async () => {
@@ -336,6 +359,19 @@ test('Taiwanese Hokkien is no longer offered: saved choices are ignored, its son
   });
   assert.deepEqual(result.dropped.map((item) => item.id), ['deezer-1']);
   assert.deepEqual(result.deezer.map((item) => [item.id, item.language]), [['deezer-2', 'zh']]);
+});
+
+test('artists checked by hand: their language wins, and a shared name only in its playlist', async () => {
+  const { labelLanguages } = await import('../src/services/music/language.js');
+  const { songs } = labelLanguages([
+    { id: 'c1', title: 'TOXIC', artist: 'LA SAD', found_in: ['ja'] }, // Italian band in a Japanese playlist
+    { id: 'c2', title: 'Lana', artist: 'Kamaitachi', found_in: ['ja'] }, // the Brazilian rapper
+    { id: 'c3', title: '바람', artist: 'Kamaitachi', found_in: ['ko'] }, // someone else with that name
+    { id: 'c4', title: 'Tip Toe', artist: 'HYBS', found_in: ['ko'] },
+    { id: 'c5', title: 'Salam Terakhir', artist: 'Amy Search', found_in: ['ms'], isrc: 'USHM91234567' },
+    { id: 'c6', title: 'The End (Korean)', artist: 'Kris Kim', found_in: ['en'] },
+  ]);
+  assert.deepEqual(songs.map((item) => item.language), ['other', 'other', 'ko', 'en', 'ms', 'ko']);
 });
 
 test('the assistant tells Malay and Indonesian apart', async () => {

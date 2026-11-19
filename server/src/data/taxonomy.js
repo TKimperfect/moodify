@@ -155,10 +155,14 @@ export const LANGUAGES = {
   ja: 'Japanese',
 };
 export const LANGUAGE_IDS = Object.keys(LANGUAGES);
-export const SONG_LANGUAGE_IDS = [...LANGUAGE_IDS, 'instrumental', 'other'];
+// "unknown": nothing in the song data or a web search tells the language.
+export const SONG_LANGUAGE_IDS = [...LANGUAGE_IDS, 'instrumental', 'other', 'unknown'];
 // Languages MOODIFY offered before (Taiwanese Hokkien until 1.2.13): still
 // accepted in saved preferences, and quietly left out.
 export const RETIRED_LANGUAGE_IDS = ['nan'];
+// A song still labelled with a retired language (kept because someone saved or
+// played it) is shown as "Other languages".
+export const currentLanguage = (language) => (RETIRED_LANGUAGE_IDS.includes(language) ? 'other' : language);
 export const withoutRetired = (languages) => (Array.isArray(languages) ? languages.filter((language) => !RETIRED_LANGUAGE_IDS.includes(language)) : languages);
 
 // Shared rules for songs whose moods are known but whose energy, effects and

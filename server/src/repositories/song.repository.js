@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SONGS as SAMPLE_SONGS } from '../data/songs.js';
-import { MOOD_IDS, EFFECT_IDS, GENRE_IDS, SONG_LANGUAGE_IDS } from '../data/taxonomy.js';
+import { MOOD_IDS, EFFECT_IDS, GENRE_IDS, SONG_LANGUAGE_IDS, currentLanguage } from '../data/taxonomy.js';
 import { getPublicClient, isSupabaseConfigured } from '../lib/supabase.js';
 import { withPlayback } from '../services/music/music.service.js';
 
@@ -60,7 +60,9 @@ export function loadImportedSongs(file) {
   } catch {
     return []; // no file yet (or unreadable): just the sample songs
   }
-  const songs = Array.isArray(parsed?.songs) ? parsed.songs.filter(isValidImported) : [];
+  const songs = Array.isArray(parsed?.songs)
+    ? parsed.songs.map((song) => (song?.language ? { ...song, language: currentLanguage(song.language) } : song)).filter(isValidImported)
+    : [];
   if (Array.isArray(parsed?.songs) && songs.length < parsed.songs.length) {
     console.warn(`[songs] Ignored ${parsed.songs.length - songs.length} damaged entries in ${path.basename(file)}`);
   }
@@ -100,7 +102,7 @@ export function toSong(row) {
     album: row.album ?? null,
     duration_s: row.duration_s ?? null,
     license_url: row.license_url ?? null,
-    language: row.language ?? (row.provider === 'sample' || !row.provider ? 'instrumental' : null),
+    language: currentLanguage(row.language ?? (row.provider === 'sample' || !row.provider ? 'instrumental' : null)),
     youtube_id: row.youtube_id ?? null,
     youtube_checked_at: row.youtube_checked_at ?? null,
     mood_source: row.mood_source ?? null,

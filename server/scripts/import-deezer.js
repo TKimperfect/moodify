@@ -52,7 +52,7 @@ if (songs.length === 0) {
   process.exit(1);
 }
 
-const NAMES = { ...LANGUAGES, instrumental: 'Instrumental', other: 'Other languages' };
+const NAMES = { ...LANGUAGES, instrumental: 'Instrumental', other: 'Other languages', unknown: 'Unknown language' };
 if (changes.length) {
   console.log(`\n${changes.length} songs are sung in another language than their playlist:`);
   for (const line of describeChanges(changes, NAMES).slice(0, 12)) console.log(`  ${line}`);
