@@ -48,7 +48,7 @@ test('a full guided conversation ends with a profile', () => {
     ['Keep me company', { slot: 'effect', value: 'companionship' }],
     ['Running on empty', { slot: 'energy', value: 'low' }],
   ]);
-  assert.deepEqual(result.profile, { moods: ['lonely'], energy: 20, intensity: 75, genres: [], desired_effect: 'companionship', tempo: 'any' });
+  assert.deepEqual(result.profile, { moods: ['lonely'], energy: 20, intensity: 75, genres: [], desired_effect: 'companionship', tempo: 'any', languages: [] });
 });
 
 test('button labels are not misread as feelings', () => {

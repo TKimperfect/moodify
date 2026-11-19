@@ -2,6 +2,7 @@ import Window from '../ui/Window.jsx';
 import { MOODS } from '../../data/moods.js';
 import { DESIRED_EFFECTS, GENRES, ENERGY_WORDS, INTENSITY_WORDS } from '../../data/spectrum.js';
 import { levelWord } from '../../lib/moodProfile.js';
+import { languageShort } from '../../data/languages.js';
 
 const label = (list, id) => list.find((item) => item.id === id)?.label ?? id;
 
@@ -26,6 +27,7 @@ export default function ReadingPanel({ state, profile, notes, source, onShowSong
   const effect = current.desired_effect;
   const tempo = current.tempo;
   const genres = current.genres ?? [];
+  const languages = current.languages ?? [];
 
   return (
     <Window title="reading.log" status={profile ? 'ready' : 'listening'} aria-labelledby="reading-heading">
@@ -57,8 +59,13 @@ export default function ReadingPanel({ state, profile, notes, source, onShowSong
         <Meter name="Energy" value={current.energy} words={ENERGY_WORDS} />
         <Meter name="Intensity" value={current.intensity} words={INTENSITY_WORDS} />
 
-        {(tempo && tempo !== 'any') || genres.length ? (
+        {(tempo && tempo !== 'any') || genres.length || languages.length ? (
           <div className="flex flex-wrap gap-1.5">
+            {languages.map((id) => (
+              <span key={id} className="tag border-orchid/50 normal-case tracking-normal text-orchid">
+                {languageShort(id)}
+              </span>
+            ))}
             {tempo && tempo !== 'any' && <span className="tag">{tempo} tempo</span>}
             {genres.map((id) => (
               <span key={id} className="tag">

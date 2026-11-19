@@ -11,7 +11,7 @@ import {
 } from './assistant/dialogue.js';
 import { analyzeText } from './assistant/analyze.js';
 import { askClaude, isLlmConfigured } from './assistant/llm.js';
-import { EFFECT_IDS, GENRE_IDS, MOOD_IDS } from '../data/taxonomy.js';
+import { EFFECT_IDS, GENRE_IDS, MOOD_IDS, LANGUAGE_IDS } from '../data/taxonomy.js';
 
 const MAX_TURNS = 5; // after this many turns the assistant stops asking and recommends
 
@@ -31,6 +31,8 @@ function mergeAi(state, ai) {
   if (ai.tempo) state.tempo = ai.tempo;
   const genres = ai.genres.filter((genre) => GENRE_IDS.includes(genre));
   if (genres.length) state.genres = [...new Set(genres)];
+  const languages = (ai.languages ?? []).filter((language) => LANGUAGE_IDS.includes(language));
+  if (languages.length) state.languages = [...new Set(languages)];
 }
 
 async function respondWithAi({ message, choice, history, state: previous }) {
@@ -100,6 +102,7 @@ export async function analyze({ text }) {
       intensity: result.state.intensity,
       tempo: result.state.tempo,
       genres: result.state.genres,
+      languages: result.state.languages,
     },
     complete: Boolean(result.profile),
     profile: result.profile,

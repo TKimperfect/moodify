@@ -9,7 +9,7 @@
 //  2. Live search on the Discover page.
 import { env } from '../../../config/env.js';
 import { HttpError } from '../../../lib/httpError.js';
-import { MOOD_HINTS } from '../../../data/taxonomy.js';
+import { MOOD_HINTS, LANGUAGE_IDS } from '../../../data/taxonomy.js';
 import { fetchJson, createCache } from './http.js';
 
 const cache = createCache();
@@ -100,6 +100,13 @@ export function mapJamendoTrack(track, { hintMood = null, rank = 0 } = {}) {
   if (moods.includes('angry')) effects.unshift('release');
   if (energy <= 30) effects.push('atmosphere');
 
+  // Jamendo marks instrumental tracks; for sung tracks it may give a language code.
+  const lang = String(track.musicinfo?.lang ?? '').toLowerCase().slice(0, 3);
+  let language = 'other';
+  if (track.musicinfo?.vocalinstrumental === 'instrumental') language = 'instrumental';
+  else if (LANGUAGE_IDS.includes(lang)) language = lang;
+  else if (!lang && !track.musicinfo) language = 'other';
+
   const licenceUrl = track.license_ccurl || null;
   const song = {
     id: `jamendo-${String(track.id).replace(/[^0-9]/g, '')}`,
@@ -121,6 +128,8 @@ export function mapJamendoTrack(track, { hintMood = null, rank = 0 } = {}) {
     album: track.album_name || null,
     duration_s: Number(track.duration) || null,
     license_url: licenceUrl,
+    language,
+    mood_source: 'estimated',
   };
   return song;
 }

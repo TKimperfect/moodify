@@ -41,6 +41,8 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.profiles add column if not exists favorite_languages text[] not null default '{}';
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
@@ -111,6 +113,14 @@ alter table public.songs add column if not exists album text;
 alter table public.songs add column if not exists duration_s integer check (duration_s is null or duration_s between 1 and 7200);
 alter table public.songs add column if not exists license_url text;
 
+-- Added in Phase 10 (also in migrations/003_languages_youtube.sql)
+alter table public.songs add column if not exists language text;
+alter table public.songs add column if not exists youtube_id text;
+alter table public.songs add column if not exists youtube_checked_at timestamptz;
+alter table public.songs add column if not exists mood_source text;
+alter table public.songs alter column year drop not null;
+create index if not exists songs_language_idx on public.songs (language);
+
 create index if not exists songs_moods_idx on public.songs using gin (moods);
 create index if not exists songs_genres_idx on public.songs using gin (genres);
 
@@ -130,6 +140,7 @@ create table if not exists public.mood_sessions (
   source text not null default 'manual' check (source in ('manual', 'assistant')),
   created_at timestamptz not null default now()
 );
+alter table public.mood_sessions add column if not exists languages text[] not null default '{}';
 
 create index if not exists mood_sessions_user_idx on public.mood_sessions (user_id, created_at desc);
 

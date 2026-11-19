@@ -14,9 +14,14 @@ import {
   GENRE_PATTERNS,
   UNSURE,
   CRISIS,
+  LANGUAGE_PATTERNS,
+  EXTRA_MOOD_PATTERNS,
+  EXTRA_EFFECT_PATTERNS,
 } from './lexicon.js';
 
-const NEGATION_BEFORE = /\b(?:not|never|no|don'?t|do not|didn'?t|isn'?t|wasn'?t|aren'?t|ain'?t|without|hardly|barely)\s+(?:\w+\s+){0,2}$/;
+const NEGATION_BEFORE = /\b(?:not|never|no|don'?t|do not|didn'?t|isn'?t|wasn'?t|aren'?t|ain'?t|without|hardly|barely|tidak|tak|bukan)\s+(?:\w+\s+){0,2}$/;
+// Chinese negation sits right before the word: 不开心, 没快乐, 唔开心.
+const CJK_NEGATION_BEFORE = /[不没沒唔非]$/;
 
 export function normalize(text) {
   return ` ${String(text).toLowerCase().replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').trim()} `;
@@ -28,11 +33,16 @@ function findAll(text, { re, negatable }) {
   re.lastIndex = 0;
   for (const match of text.matchAll(re)) {
     const before = text.slice(Math.max(0, match.index - 30), match.index);
-    if (negatable && NEGATION_BEFORE.test(before)) continue;
+    if (negatable && (NEGATION_BEFORE.test(before) || CJK_NEGATION_BEFORE.test(before))) continue;
     hits.push(match[0].trim());
   }
   return hits;
 }
+
+// Merges two pattern tables (English + Chinese/Malay) per id.
+const merge = (a, b) => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map((id) => [id, [...(a[id] ?? []), ...(b[id] ?? [])]]));
+const ALL_MOODS = merge(MOOD_PATTERNS, EXTRA_MOOD_PATTERNS);
+const ALL_EFFECTS = merge(EFFECT_PATTERNS, EXTRA_EFFECT_PATTERNS);
 
 function scan(text, table) {
   const found = [];
@@ -47,8 +57,8 @@ function scan(text, table) {
 export function analyzeText(raw) {
   const text = normalize(raw);
 
-  const moods = scan(text, MOOD_PATTERNS).sort((a, b) => b.count - a.count);
-  const effects = scan(text, EFFECT_PATTERNS); // keeps table order for ties
+  const moods = scan(text, ALL_MOODS).sort((a, b) => b.count - a.count);
+  const effects = scan(text, ALL_EFFECTS); // keeps table order for ties
   const bestEffect = effects.reduce((best, item) => (!best || item.count > best.count ? item : best), null);
 
   let energy = null;
@@ -69,6 +79,7 @@ export function analyzeText(raw) {
 
   const tempo = scan(text, TEMPO_PATTERNS)[0]?.id ?? null;
   const genres = scan(text, GENRE_PATTERNS).map((item) => item.id);
+  const languages = scan(text, LANGUAGE_PATTERNS).map((item) => item.id);
 
   return {
     moods,
@@ -78,6 +89,7 @@ export function analyzeText(raw) {
     intensityShift,
     tempo,
     genres,
+    languages,
     unsure: findAll(text, UNSURE).length > 0,
     crisis: findAll(text, CRISIS).length > 0,
   };

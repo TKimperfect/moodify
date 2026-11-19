@@ -2,7 +2,7 @@
 
 AI-powered emotional music discovery. *Music that understands how you feel.*
 
-**Current status: Phase 9 complete** – tested, hardened and ready to deploy: frontend on Vercel, backend on Render, database on Supabase. All free tiers; the project is non-commercial.
+**Current status: 1.2** – mood data from two research datasets (MTG-Jamendo human tags, MuSe listener scores), songs in seven languages, full songs through YouTube (optional), Credits page. Deployed: frontend on Vercel, backend on Render, database on Supabase.
 
 ## What you need installed
 
@@ -148,6 +148,68 @@ The mood assistant works for free with its built-in engine (English only). With 
 
 If Claude is unreachable, out of credit, or answers oddly, the assistant silently falls back to the built-in engine, so the chat never breaks. Messages that suggest someone may be in danger are always answered by the built-in engine with a supportive message and a helpline link, never sent to the AI.
 
+## Better moods from research datasets (1.2)
+
+Two published datasets replace MOODIFY's guesses with real mood information. The reason under a song says which one was used ("Mood tagged by people in the MTG-Jamendo dataset"). Both are credited on the **Credits** page (footer), as their licences require.
+
+| Dataset | What it adds | Licence |
+| ------- | ------------ | ------- |
+| **MTG-Jamendo** (Bogdanov et al., 2019) | Human mood/theme tags (sad, melancholic, relaxing, energetic, romantic…) for about 18,000 Jamendo songs. MOODIFY translates them to its ten moods and plays the songs in full from Jamendo | Metadata CC BY-NC-SA 4.0, **non-commercial research and academic use only** |
+| **MuSe** (Akiki & Burghardt, 2021) | Valence and arousal scores from Last.fm listener tags for about 90,000 well-known songs. MOODIFY finds each song on Deezer (preview, or full on YouTube) | CC BY 4.0 |
+
+Run these after the other imports (later imports improve the moods of songs already in the catalogue):
+
+```bash
+npm run music:import-mtg
+```
+
+Needs `JAMENDO_CLIENT_ID`. Downloads the tag file from GitHub and imports **every** song that has a mood tag (about 18,000; a few minutes). To import fewer, give a maximum per mood: `npm run music:import-mtg -- 100`.
+
+```bash
+npm run music:prune-languages
+```
+
+After changing the language search words, songs from the old searches stay in Supabase. This shows how many there are; add `-- delete` to remove them. Songs anyone saved, rated or played are always kept.
+
+```bash
+npm run music:import-muse
+```
+
+Downloads MuSe from Zenodo (about 15 MB) and looks up every usable song on Deezer. It checks 4 songs at a time while keeping one shared pace (one request per 150 ms), so the full run takes about 6 to 7 hours (it can be stopped and continued any number of times). Change the number with `DEEZER_LOOKUP_WORKERS` (1 to 8) in `server/.env`. Progress is saved in `server/data/muse-progress-v2.json`: press `Ctrl + C` once to stop, and run the command again to continue. The Zenodo file has no mood words, only three scores per song (valence, arousal, dominance). MOODIFY splits valence and arousal into thirds measured on the file and uses dominance (measured among the unpleasant songs) to tell anger from fear and sadness from loneliness, which gives all ten moods (see `server/src/services/music/datasets/muse.js`). When the mood rules change, songs found in earlier runs are relabelled on the next run without looking them up again. If the download fails, download `muse_dataset.csv` yourself and pass its path: `npm run music:import-muse -- "C:\Users\you\Downloads\muse_dataset.csv"`.
+
+If MOODIFY ever becomes commercial, MTG-Jamendo needs written permission from Jamendo first.
+
+## Songs in seven languages (1.1)
+
+Languages: **Malay, Mandarin, Cantonese, Taiwanese Hokkien, Korean, Japanese, English**. Users choose them on the home page (per mood) and in Profile > Music preferences (the default when none is chosen). The assistant understands requests like "想听粤语歌", "lagu melayu" or "K-pop", and also feelings written in Chinese or Malay.
+
+When too few songs exist in a chosen language for a mood, instrumental music fills the rest of the list (and says so).
+
+### 1. Update the database (once)
+
+Supabase > **SQL Editor** > New query > paste `supabase/migrations/003_languages_youtube.sql` > **Run**. Do this **before** pushing the new code to GitHub (Render redeploys automatically).
+
+### 2. Import songs in all seven languages (free, no key)
+
+```bash
+npm run music:import-languages
+```
+
+For every language and mood it searches Deezer playlists (for example "粤语 伤感", "cantopop sad" or "lagu melayu sedih") and takes **every** song from the 10 most relevant playlists of each search. This can take 30 minutes or more. Songs are saved to Supabase and to `server/data/deezer-catalog.json`. To import fewer, give a maximum per language and mood: `npm run music:import-languages -- 50`. When a language and mood finds nothing, the output lists each search it tried. The mood of each song comes from the playlist it was found in, so it is a good guess rather than a certainty.
+
+Also run `npm run music:import` again so Jamendo songs get their language too.
+
+### 3. Full songs on YouTube (optional, free)
+
+Without this, Deezer songs play a 30-second preview. With it, they play in full in YouTube's own player, shown as a small video window (YouTube requires the player to stay visible). If YouTube has no suitable video, or the owner does not allow playing it on other sites, MOODIFY plays the preview instead and says why. Listeners can switch "Full songs" off in the player.
+
+1. Open https://console.cloud.google.com and create a project (e.g. `moodify`).
+2. **APIs & Services > Library**, search **YouTube Data API v3**, **Enable**.
+3. **APIs & Services > Credentials > Create credentials > API key**. Then **Edit** the key: under **API restrictions** choose **Restrict key** > **YouTube Data API v3**, and save.
+4. Put the key in `server/.env` as `YOUTUBE_API_KEY=...` and in Render (Environment) under the same name.
+
+The free daily limit is enough to find about 100 new songs a day. Each song is looked up once and remembered; following YouTube's rules, every remembered video is checked again after 30 days.
+
 ## Deploy it to the internet (free)
 
 | Part | Host | Free plan notes |
@@ -241,7 +303,8 @@ moodify/
 ├── supabase/
 │   ├── schema.sql          Database tables + access policies (paste into Supabase SQL Editor)
 │   └── migrations/
-│       └── 002_music_sources.sql   Phase 7 columns (cover art, licences)
+│       ├── 002_music_sources.sql      Phase 7 columns (cover art, licences)
+│       └── 003_languages_youtube.sql  Song languages, YouTube videos, mood sources
 │
 ├── client/                 FRONTEND – what the user sees (React + Vite + Tailwind)
 │   ├── package.json        Frontend dependencies
@@ -265,6 +328,7 @@ moodify/
 │       │   ├── session.js           Login session rules (+ session.test.js)
 │       │   ├── time.js              "3 minutes ago" (+ time.test.js)
 │       │   ├── retry.js             Waits for a sleeping server (+ retry.test.js)
+│       │   ├── youtubeApi.js        Loads YouTube's official player
 │       │   └── storage.js           Safe saving in the browser
 │       ├── context/
 │       │   ├── MoodProfileContext.jsx  Shared memory of the user's mood choices
@@ -275,6 +339,7 @@ moodify/
 │       ├── data/
 │       │   ├── moods.js        The ten moods and their pixel icons
 │       │   ├── spectrum.js     Desired experiences, tempos, genres, slider words
+│       │   ├── languages.js    The seven song languages
 │       │   ├── featured.js     Offline copy of the homepage songs
 │       │   └── navigation.js   Menu links
 │       ├── components/
@@ -284,7 +349,7 @@ moodify/
 │       │   ├── home/           Hero, MoodGrid, AssistantEntry, FeaturedTracks
 │       │   ├── mood/           SpectrumPanel, ExperiencePanel, ProfilePanel, ProfileReadout
 │       │   ├── assistant/      ChatMessage, ReadingPanel ("what I'm hearing")
-│       │   ├── player/         PlayerBar, QueuePanel, SongActions (Play / + Queue), icons
+│       │   ├── player/         PlayerBar, QueuePanel, YouTubeWindow, SongActions, icons
 │       │   ├── account/        AddToPlaylist, MoodSessionList, RequireLogin
 │       │   └── music/          RecommendationCard, SongTile, SongTags, LikeButton
 │       └── pages/
@@ -296,6 +361,7 @@ moodify/
 │           ├── Library.jsx          Favourites, playlists, recently played, saved moods
 │           ├── PlaylistDetail.jsx   One playlist: play, rename, remove songs, delete
 │           ├── Profile.jsx          Account, music preferences, mood history, settings
+│           ├── Credits.jsx          Music and data sources, with their licences
 │           ├── SystemCheck.jsx      Frontend/backend connection check (/status)
 │           └── NotFound.jsx         404 page
 │
@@ -305,6 +371,10 @@ moodify/
     ├── scripts/
     │   ├── seed.js             Copies the sample songs into Supabase (npm run db:seed)
     │   ├── import-jamendo.js   Imports Creative Commons songs (npm run music:import)
+    │   ├── import-deezer.js    Imports songs in seven languages (npm run music:import-languages)
+    │   ├── import-mtg.js       Imports MTG-Jamendo mood-tagged songs (npm run music:import-mtg)
+    │   ├── import-muse.js      Imports MuSe songs via Deezer (npm run music:import-muse)
+    │   ├── catalogStore.js     Saves imported songs (file + Supabase)
     │   └── supabase-check.js   End-to-end self-check (npm run db:check)
     ├── src/
     │   ├── index.js        Starts the server
@@ -327,6 +397,10 @@ moodify/
 │   │   │   ├── music.service.js     What can be played for each song, audio cache
 │   │   │   ├── synth.js             Composes the original sample audio (WAV)
 │   │   │   ├── jamendoImport.js     Builds the Jamendo catalogue, a batch per mood
+│   │   │   ├── deezerCatalog.js     Builds the seven-language catalogue from Deezer playlists
+│   │   │   ├── datasets/            mtgJamendo.js, muse.js: read the datasets, translate moods
+│   │   │   ├── datasetImport.js     Imports both datasets
+│   │   │   ├── youtube.service.js   Finds and remembers YouTube videos (30-day re-check)
 │   │   │   └── providers/           sample, jamendo, deezer, spotify, youtube
 │   │   ├── assistant.service.js       Mood assistant: Claude or built-in engine
 │   │   ├── assistant/
@@ -354,7 +428,9 @@ moodify/
         ├── accounts-supabase.test.js   Behaviour against a pretend Supabase
         ├── music.test.js               Audio files, seeking, Spotify mapping, skips
         ├── music-sources.test.js       Jamendo import and Deezer search (pretend servers)
-        └── production.test.js          Production settings: allowed frontends, logs, errors
+        ├── production.test.js          Production settings: allowed frontends, logs, errors
+        ├── languages.test.js           Languages, Deezer catalogue, YouTube (pretend servers)
+        └── datasets.test.js            MTG-Jamendo, MuSe, reading >1000 songs
 ```
 
 ## API endpoints
@@ -376,6 +452,8 @@ Open to everyone:
 | GET    | `/api/audio/sample/:id.wav`| Original audio for a sample song (seekable)    |
 | GET    | `/api/music/providers`     | Which music providers are switched on          |
 | GET    | `/api/music/search?q=&source=` | Search real songs (deezer, jamendo, spotify) |
+| GET    | `/api/music/youtube?song_id=` | YouTube video for a song (full playback)  |
+| GET    | `/api/audio/deezer/:id`    | Redirects to a fresh Deezer preview            |
 
 Logged-in users only (send `Authorization: Bearer <access_token>`):
 
@@ -412,3 +490,7 @@ Songs you reject never return. Songs you skip in the first half count as a gentl
 - **"npm is not recognized" / "command not found"** – Node.js is not installed, or the terminal was open during installation. Close and reopen it.
 - **Backend row shows "not reachable"** – the backend is not running. Use `npm run dev` from the `moodify` folder (not from `client`).
 - **"Port 4000/5173 is already in use"** – another copy is still running. Close other terminals, or change `PORT` in `server/.env` (and the `target` in `client/vite.config.js` to match).
+### Large catalogues
+
+With all imports the songs table holds over 100,000 songs (about 70 MB). The server reads them when it starts (4 pages of 1,000 at a time, so the first visitor after Render wakes up waits a little longer) and then every 6 hours in the background, while it keeps answering with the songs it already has. This keeps within Supabase's free monthly data allowance. To see newly imported songs on the website at once, restart the backend on Render (Manual Deploy → Restart). `SONGS_CACHE_MINUTES` in `server/.env` changes the 6 hours.
+

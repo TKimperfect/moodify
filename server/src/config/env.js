@@ -60,6 +60,19 @@ export const env = {
     // Public search with 30-second previews; needs no key. Set DEEZER_ENABLED=false to switch off.
     enabled: read('DEEZER_ENABLED').toLowerCase() !== 'false',
     apiBase: read('DEEZER_API_BASE') || 'https://api.deezer.com',
+    requestGapMs: Number(read('DEEZER_REQUEST_GAP_MS') || 150),
+    // MuSe import: how many songs are looked up at the same time.
+    lookupWorkers: Math.min(8, Math.max(1, Number(read('DEEZER_LOOKUP_WORKERS') || 4))),
+  },
+  datasets: {
+    // Where the research datasets are downloaded from (changeable for tests or mirrors).
+    mtgUrl: read('MTG_JAMENDO_URL'),
+    museUrl: read('MUSE_URL'),
+  },
+  youtube: {
+    // Optional. Full songs through YouTube's embedded player.
+    apiKey: read('YOUTUBE_API_KEY'),
+    apiBase: read('YOUTUBE_API_BASE') || 'https://www.googleapis.com',
   },
   spotify: {
     // Optional. Song information and links from Spotify.

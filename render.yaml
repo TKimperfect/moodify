@@ -28,5 +28,7 @@ services:
       - key: JAMENDO_CLIENT_ID
         sync: false
       # Optional (leave empty when Render asks):
+      - key: YOUTUBE_API_KEY
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false

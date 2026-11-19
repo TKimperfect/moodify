@@ -7,11 +7,11 @@ import { providersStatus } from './music/music.service.js';
 const startedAt = Date.now();
 
 export async function getHealthStatus() {
-  const database = await songRepository.status({ fresh: true });
+  const database = await songRepository.status();
   return {
     status: 'ok',
     service: 'moodify-api',
-    version: '1.0.0',
+    version: '1.2.3',
     environment: env.nodeEnv,
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
     timestamp: new Date().toISOString(),
@@ -23,6 +23,7 @@ export async function getHealthStatus() {
       song_source: database.source,
       songs: database.songs,
       by_provider: database.by_provider,
+      by_language: database.by_language,
       // Shown on the status page so setup problems are easy to spot.
       note: database.configured ? database.problem : 'Supabase is not configured; using built-in sample songs',
     },

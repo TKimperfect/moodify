@@ -1,7 +1,7 @@
 // Describes exactly what each request is allowed to contain.
 // Anything that does not match is rejected before it reaches the logic.
 import { z } from 'zod';
-import { MOOD_IDS, EFFECT_IDS, GENRE_IDS, TEMPO_IDS } from '../data/taxonomy.js';
+import { MOOD_IDS, EFFECT_IDS, GENRE_IDS, TEMPO_IDS, LANGUAGE_IDS, SONG_LANGUAGE_IDS } from '../data/taxonomy.js';
 
 const songId = z.string().min(1).max(80).regex(/^[a-z0-9-]+$/, 'Invalid song id');
 const idList = z.array(songId).max(300).default([]);
@@ -16,6 +16,7 @@ export const moodProfileSchema = z.strictObject({
   genres: z.array(z.enum(GENRE_IDS)).max(GENRE_IDS.length).refine(unique, 'Genres must not repeat').default([]),
   desired_effect: z.enum(EFFECT_IDS),
   tempo: z.enum(TEMPO_IDS).default('any'),
+  languages: z.array(z.enum(LANGUAGE_IDS)).max(LANGUAGE_IDS.length).refine(unique, 'Languages must not repeat').default([]),
 });
 
 export const recommendationRequestSchema = z.strictObject({
@@ -31,6 +32,7 @@ export const songSearchSchema = z.strictObject({
   q: z.string().max(80).optional(),
   mood: z.enum(MOOD_IDS).optional(),
   genre: z.enum(GENRE_IDS).optional(),
+  language: z.enum(SONG_LANGUAGE_IDS).optional(),
   ids: z
     .string()
     .max(4000)
@@ -66,6 +68,7 @@ export const profileUpdateSchema = z
   .strictObject({
     display_name: displayName.optional(),
     favorite_genres: z.array(z.enum(GENRE_IDS)).max(GENRE_IDS.length).refine(unique, 'Genres must not repeat').optional(),
+    favorite_languages: z.array(z.enum(LANGUAGE_IDS)).max(LANGUAGE_IDS.length).refine(unique, 'Languages must not repeat').optional(),
   })
   .refine((value) => Object.keys(value).length > 0, 'Nothing to update');
 
@@ -118,6 +121,7 @@ export const assistantStateSchema = z.strictObject({
   genres: z.array(z.enum(GENRE_IDS)).max(GENRE_IDS.length).refine(unique, 'Genres must not repeat').default([]),
   desired_effect: z.enum(EFFECT_IDS).nullable().default(null),
   tempo: z.enum(TEMPO_IDS).nullable().default(null),
+  languages: z.array(z.enum(LANGUAGE_IDS)).max(LANGUAGE_IDS.length).default([]),
   asked: z.array(z.enum(['moods', 'effect', 'energy', 'other'])).max(20).default([]),
   turns: z.number().int().min(0).max(100).default(0),
 });
@@ -148,3 +152,13 @@ export const externalSearchSchema = z.strictObject({
   source: z.enum(['jamendo', 'deezer', 'spotify']).default('deezer'),
   limit: z.coerce.number().int().min(1).max(10).default(10),
 });
+
+export const deezerAudioParamsSchema = z.strictObject({ id: z.string().regex(/^\d{1,20}$/, 'Invalid Deezer track id') });
+
+export const youtubeLookupSchema = z
+  .strictObject({
+    song_id: songId.optional(),
+    title: z.string().trim().min(1).max(200).optional(),
+    artist: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((value) => value.song_id || (value.title && value.artist), 'Give song_id, or title and artist');

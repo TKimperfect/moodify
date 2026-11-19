@@ -40,6 +40,7 @@ const turn = (fields) =>
     intensity: null,
     tempo: null,
     genres: [],
+    languages: [],
     ready: false,
     follow_up: null,
     ...fields,
@@ -82,7 +83,7 @@ test('a ready answer from Claude becomes a profile', async () => {
   nextAnswer = { text: turn({ reply: 'Got it: sad, and you want company.', moods: ['sad', 'lonely'], desired_effect: 'companionship', energy: 22, intensity: 140, ready: true }) };
   const result = await respond({ message: 'I want company', choice: null, history: [], state: { moods: ['sad'], asked: ['effect'], turns: 1 } });
   assert.equal(result.source, 'ai');
-  assert.deepEqual(result.profile, { moods: ['sad', 'lonely'], energy: 22, intensity: 100, genres: [], desired_effect: 'companionship', tempo: 'any' });
+  assert.deepEqual(result.profile, { moods: ['sad', 'lonely'], energy: 22, intensity: 100, genres: [], desired_effect: 'companionship', tempo: 'any', languages: [] });
   assert.equal(result.reply, 'Got it: sad, and you want company.');
 });
 
@@ -116,4 +117,10 @@ test('only valid ids from Claude are kept', async () => {
   assert.deepEqual(result.profile.genres, ['indie']);
   // History sent to Claude must start with a user message.
   assert.equal(requests.at(-1).body.messages[0].role, 'user');
+});
+
+test('languages from Claude are kept and passed on', async () => {
+  nextAnswer = { text: turn({ moods: ['sad'], desired_effect: 'embrace', languages: ['yue'], ready: true }) };
+  const result = await respond({ message: '想听粤语歌', choice: null, history: [], state: null });
+  assert.deepEqual(result.profile.languages, ['yue']);
 });

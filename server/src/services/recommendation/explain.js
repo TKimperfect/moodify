@@ -1,6 +1,6 @@
 // Turns the numbers from scoring.js into sentences a person can read:
 // "why was this song recommended to me?"
-import { EFFECTS, GENRES, ENERGY_WORDS, targetEnergy, moodAffinity, effectAffinity } from '../../data/taxonomy.js';
+import { EFFECTS, GENRES, ENERGY_WORDS, LANGUAGES, targetEnergy, moodAffinity, effectAffinity } from '../../data/taxonomy.js';
 
 function list(words) {
   if (words.length <= 1) return words.join('');
@@ -51,6 +51,19 @@ export function explain(profile, song, parts) {
     if (asked.length > 0) reasons.push(`${list(asked.map((genre) => GENRES[genre]))}, as you asked.`);
     else if (parts.genre > 0) reasons.push(`${GENRES[song.genres[0]]} is close to the genres you picked.`);
   }
+
+  // Language
+  const languages = profile.languages ?? [];
+  if (languages.length > 0) {
+    if (languages.includes(song.language)) reasons.push(`Sung in ${LANGUAGES[song.language]}, as you asked.`);
+    else if (song.language === 'instrumental') {
+      reasons.push(`Instrumental, added because there are few ${list(languages.map((id) => LANGUAGES[id]))} songs for this mood yet.`);
+    }
+  }
+
+  // Where the mood information comes from (research datasets)
+  if (song.mood_source === 'mtg-jamendo' && shared.length > 0) reasons.push('Mood tagged by people in the MTG-Jamendo dataset.');
+  if (song.mood_source === 'muse' && shared.length > 0) reasons.push("Mood measured from listeners' tags (MuSe dataset).");
 
   // History
   if (parts.history >= 0.65) reasons.push('Similar to songs you have liked.');

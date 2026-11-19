@@ -110,6 +110,19 @@ test('falls back to built-in songs when the table is empty or the database fails
   await songRepository.status({ fresh: true });
 });
 
+test('a failed re-read keeps the songs already loaded from the database', async () => {
+  songsMode = 'ok';
+  const loaded = await songRepository.status({ fresh: true });
+  assert.equal(loaded.source, 'supabase');
+  songsMode = 'error';
+  const status = await songRepository.status({ fresh: true });
+  assert.equal(status.source, 'supabase');
+  assert.equal(status.songs, loaded.songs);
+  assert.ok(status.problem);
+  songsMode = 'ok';
+  await songRepository.status({ fresh: true });
+});
+
 test('protected routes need a valid token', async () => {
   assert.equal((await send('GET', '/api/favorites')).status, 401);
   assert.equal((await send('GET', '/api/favorites', { token: 'wrong' })).status, 401);

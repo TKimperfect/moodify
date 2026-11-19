@@ -2,6 +2,7 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { isSupabaseConfigured } from './lib/supabase.js';
+import { songRepository } from './repositories/song.repository.js';
 
 const app = createApp();
 
@@ -14,6 +15,12 @@ const server = app.listen(env.port, () => {
       ? 'Database:            Supabase configured'
       : 'Database:            not configured (using built-in sample songs; accounts disabled)',
   );
+  // Start reading the songs now, so the first visitor waits less.
+  const started = Date.now();
+  songRepository
+    .findAll()
+    .then((songs) => console.log(`Songs loaded:        ${songs.length} (${((Date.now() - started) / 1000).toFixed(1)} s)`))
+    .catch(() => {});
 });
 
 // Hosting platforms stop the app with SIGTERM when they restart or redeploy:

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Artwork from '../ui/Artwork.jsx';
 import PixelGlyph from '../ui/PixelGlyph.jsx';
 import QueuePanel from './QueuePanel.jsx';
+import YouTubeWindow from './YouTubeWindow.jsx';
 import { ICONS } from './icons.js';
 import { usePlayer, isPlayable } from '../../context/PlayerContext.jsx';
 
@@ -39,15 +40,19 @@ export default function PlayerBar() {
   const song = player.current;
   if (!song && player.queue.length === 0) return null;
 
-  const playable = isPlayable(song);
+  const onYouTube = player.engine === 'youtube';
+  const playable = isPlayable(song) || onYouTube;
   const playing = player.status === 'playing' || player.status === 'loading';
   const duration = player.duration || song?.playback?.duration_s || 0;
   const repeatLabel = { off: 'Repeat: off', all: 'Repeat: all', one: 'Repeat: this song' }[player.repeat];
-  const statusText = STATUS_TEXT[player.status] ?? song?.playback?.label ?? '';
+  let statusText = STATUS_TEXT[player.status] ?? song?.playback?.label ?? '';
+  if (onYouTube && player.status !== 'loading') statusText = 'Full song · YouTube';
+  if (player.youtube.message) statusText = player.youtube.message;
 
   return (
     <>
       {queueOpen && <QueuePanel onClose={() => setQueueOpen(false)} />}
+      {onYouTube && song && <YouTubeWindow />}
       <section className="player-bar fixed inset-x-0 bottom-0 z-40" aria-label="Music player">
         {/* Progress bar (full width, on top) */}
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pt-2 sm:px-6">
@@ -77,7 +82,7 @@ export default function PlayerBar() {
               <p className="truncate text-xs text-silver">{song?.artist}</p>
               <p className="pixel-label mt-0.5 truncate text-rose" aria-live="polite">
                 {statusText}
-                {song?.playback?.links?.[0] && (song.playback.source === 'jamendo' || !playable) && (
+                {!onYouTube && song?.playback?.links?.[0] && (song.playback.source === 'jamendo' || !playable) && (
                   <>
                     {' · '}
                     <a href={song.playback.links[0].url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-frost">
@@ -104,6 +109,17 @@ export default function PlayerBar() {
 
           {/* Volume + queue (wide screens) */}
           <div className="hidden items-center justify-end gap-2 md:flex">
+            {player.youtube.available && (
+              <button
+                type="button"
+                className={`pixel-label rounded-md border px-2 py-1.5 ${player.youtube.fullSongs ? 'border-orchid text-orchid' : 'border-line text-silver hover:text-frost'}`}
+                aria-pressed={player.youtube.fullSongs}
+                onClick={() => player.setFullSongs(!player.youtube.fullSongs)}
+                title="Play whole songs through YouTube when available"
+              >
+                Full songs
+              </button>
+            )}
             <ControlButton icon={player.muted || player.volume === 0 ? 'muted' : 'volume'} label={player.muted ? 'Unmute' : 'Mute'} active={null} onClick={player.toggleMute} />
             <input
               type="range"

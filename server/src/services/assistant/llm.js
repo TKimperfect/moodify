@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
-import { MOOD_IDS, EFFECTS, EFFECT_IDS, GENRE_IDS } from '../../data/taxonomy.js';
+import { MOOD_IDS, EFFECTS, EFFECT_IDS, GENRE_IDS, LANGUAGES, LANGUAGE_IDS } from '../../data/taxonomy.js';
 
 export const isLlmConfigured = Boolean(env.anthropic.apiKey);
 
@@ -30,6 +30,7 @@ const AssistantTurn = z.object({
   intensity: z.number().int().nullable().describe('How strongly they feel it, 0-100, or null if unknown.'),
   tempo: z.enum(['slow', 'medium', 'fast', 'any']).nullable(),
   genres: z.array(z.enum(GENRE_IDS)),
+  languages: z.array(z.enum(LANGUAGE_IDS)).describe('Languages the songs should be sung in, if the person asked for any. Empty otherwise.'),
   ready: z.boolean().describe('True once at least one mood and the desired effect are known.'),
   follow_up: z
     .object({
@@ -60,6 +61,7 @@ Structured fields:
 ${effectLines}
 - energy 0-100: how much physical or mental energy they have now. intensity 0-100: how strongly they feel it.
 - tempo: slow, medium, fast or any. genres: ${GENRE_IDS.join(', ')}.
+- languages the songs should be sung in, only if the person asks: ${Object.entries(LANGUAGES).map(([id, name]) => `${id} (${name})`).join(', ')}. Don't infer the song language from the language the person writes in.
 
 Keep everything you already know (it is given to you as current_understanding) unless the person changes it. Set ready to true once you know at least one mood and the desired effect; when ready, fill energy and intensity with your best estimate, and use the reply to sum up what you heard in a sentence, inviting corrections. When your reply asks a question, set follow_up with 2-5 short answers the person can tap.`;
 
@@ -77,6 +79,7 @@ function buildMessages(history, message, state) {
     intensity: state.intensity,
     tempo: state.tempo,
     genres: state.genres,
+    languages: state.languages,
     questions_already_asked: state.asked,
   };
   turns.push({

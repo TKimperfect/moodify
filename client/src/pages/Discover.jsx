@@ -4,6 +4,7 @@ import { LoadingPanel, ErrorPanel } from '../components/ui/StatePanels.jsx';
 import SongTile from '../components/music/SongTile.jsx';
 import { useFeedback } from '../context/FeedbackContext.jsx';
 import { MOODS } from '../data/moods.js';
+import { languageShort } from '../data/languages.js';
 import { apiGet } from '../lib/api.js';
 import { useApi } from '../lib/useApi.js';
 
@@ -24,7 +25,7 @@ export default function Discover() {
 
       {discover.data && (
         <>
-          <Browse genres={discover.data.genres} moods={discover.data.moods} />
+          <Browse genres={discover.data.genres} moods={discover.data.moods} languages={discover.data.languages ?? []} />
           <Shelf id="trending" label="Trending" title="Most played right now" songs={discover.data.trending} />
           <Shelf id="gems" label="Hidden gems" title="Overlooked, worth your time" songs={discover.data.hidden_gems} />
           <Shelf id="newest" label="New" title="Latest additions" songs={discover.data.newest} />
@@ -53,9 +54,10 @@ function Shelf({ id, label, title, songs }) {
 }
 
 // Mood playlists + genre discovery + search, combined into one browser.
-function Browse({ genres, moods }) {
+function Browse({ genres, moods, languages }) {
   const [mood, setMood] = useState('');
   const [genre, setGenre] = useState('');
+  const [language, setLanguage] = useState('');
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
 
@@ -65,10 +67,10 @@ function Browse({ genres, moods }) {
     return () => clearTimeout(timer);
   }, [text]);
 
-  const active = Boolean(mood || genre || query);
+  const active = Boolean(mood || genre || language || query);
   const results = useApi(
-    (signal) => (active ? apiGet('/songs', { params: { mood, genre, q: query, limit: 24 }, signal }) : Promise.resolve(null)),
-    [mood, genre, query],
+    (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: 24 }, signal }) : Promise.resolve(null)),
+    [mood, genre, language, query],
   );
   const moodCount = (id) => moods.find((item) => item.id === id)?.count ?? 0;
 
@@ -115,6 +117,28 @@ function Browse({ genres, moods }) {
             ))}
           </div>
         </fieldset>
+
+        {languages.some((item) => item.count > 0 && item.id !== 'instrumental') && (
+          <fieldset>
+            <legend className="font-medium text-frost">Language</legend>
+            <div className="mt-2.5 flex flex-wrap gap-2">
+              <Choice name="browse-language" value="" label="Any" checked={language === ''} onChange={() => setLanguage('')} className="choice-compact" />
+              {languages
+                .filter((item) => item.count > 0)
+                .map((item) => (
+                  <Choice
+                    key={item.id}
+                    name="browse-language"
+                    value={item.id}
+                    label={`${languageShort(item.id)} · ${item.count}`}
+                    checked={language === item.id}
+                    onChange={() => setLanguage(item.id)}
+                    className="choice-compact"
+                  />
+                ))}
+            </div>
+          </fieldset>
+        )}
 
         <fieldset>
           <legend className="font-medium text-frost">Genre</legend>

@@ -1,5 +1,6 @@
 import { songRepository } from '../repositories/song.repository.js';
-import { sampleAudioFile, providersStatus, searchExternal } from '../services/music/music.service.js';
+import { sampleAudioFile, providersStatus, searchExternal, deezerPreviewUrl } from '../services/music/music.service.js';
+import { videoFor } from '../services/music/youtube.service.js';
 import { HttpError } from '../lib/httpError.js';
 
 export async function getSampleAudio(req, res) {
@@ -23,4 +24,18 @@ export function getProviders(req, res) {
 export async function getExternalSearch(req, res) {
   const songs = await searchExternal(req.valid.query);
   res.json({ songs, count: songs.length, provider: req.valid.query.source });
+}
+
+// Sends the browser on to a fresh Deezer preview for a catalogue song.
+export async function getDeezerAudio(req, res) {
+  const { id } = req.valid.params;
+  const song = await songRepository.findById(`deezer-${id}`);
+  if (!song) throw new HttpError(404, 'Song not found');
+  res.set('Cache-Control', 'no-store');
+  res.redirect(302, await deezerPreviewUrl(id));
+}
+
+export async function getYouTubeVideo(req, res) {
+  const { song_id: songId, title, artist } = req.valid.query;
+  res.json(await videoFor({ songId, title, artist }));
 }

@@ -134,6 +134,7 @@ function RecommendationList({ profile }) {
               {data.source} engine · {data.meta.catalogue_size} sample songs
               {data.meta.learned_from > 0 && ` · learned from ${data.meta.learned_from} of your ratings`}
               {data.used_favorite_genres && ' · using your favourite genres'}
+              {data.used_favorite_languages && ' · using your profile languages'}
             </p>
             <h2 id="matches-heading" ref={headingRef} tabIndex={-1} className="mt-2 font-display text-xl tracking-wider text-frost outline-none">
               {visible.length} songs for right now
@@ -148,6 +149,12 @@ function RecommendationList({ profile }) {
             </button>
           </div>
         </div>
+
+        {data.meta.instrumental_fill && (
+          <p className="mt-3 rounded-md border border-line bg-void/60 px-3 py-2 text-sm text-silver">
+            There are not many songs in the language you chose for this mood yet, so instrumental music fills the rest of the list.
+          </p>
+        )}
 
         <div className="mt-3 min-h-6 text-sm text-silver" aria-live="polite">
           {lastRejected && (

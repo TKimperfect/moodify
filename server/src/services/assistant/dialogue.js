@@ -2,7 +2,7 @@
 // It keeps a small "state" (what it knows so far), asks one question at a
 // time about what is still missing, and never assumes that a mood decides
 // the music: when the person has not said what they want, it asks.
-import { EFFECTS, GENRES, MOOD_HINTS, MOOD_LABELS, ENERGY_WORDS } from '../../data/taxonomy.js';
+import { EFFECTS, GENRES, LANGUAGES, MOOD_HINTS, MOOD_LABELS, ENERGY_WORDS } from '../../data/taxonomy.js';
 import { analyzeText } from './analyze.js';
 
 export const MAX_MOODS = 3;
@@ -14,6 +14,7 @@ export const EMPTY_STATE = Object.freeze({
   genres: [],
   desired_effect: null,
   tempo: null,
+  languages: [],
   asked: [],
   turns: 0,
 });
@@ -157,6 +158,12 @@ function applyAnalysis(state, analysis, notes) {
       notes.push(`Genre: ${GENRES[genre]}`);
     }
   }
+  for (const language of analysis.languages) {
+    if (!state.languages.includes(language)) {
+      state.languages.push(language);
+      notes.push(`Language: ${LANGUAGES[language]}`);
+    }
+  }
   if (analysis.unsure) state.unsure = true;
 }
 
@@ -196,6 +203,7 @@ export function finalize(state) {
       genres: state.genres,
       desired_effect: state.desired_effect,
       tempo: state.tempo ?? 'any',
+      languages: state.languages,
     },
     notes,
   };
@@ -207,6 +215,7 @@ export function summarize(profile) {
   let text = `Here's what I'm hearing: ${list(profile.moods)}, ${energyWord} energy, and you'd like the music to “${effect}”`;
   if (profile.tempo !== 'any') text += `, ${profile.tempo} tempo`;
   if (profile.genres.length) text += `, leaning ${list(profile.genres.map((genre) => GENRES[genre]))}`;
+  if (profile.languages?.length) text += `, sung in ${list(profile.languages.map((id) => LANGUAGES[id]))}`;
   return `${text}. If anything's off, just tell me.`;
 }
 
@@ -223,6 +232,7 @@ export const SUPPORT_MESSAGE =
 export function cleanState(input) {
   const state = structuredClone({ ...EMPTY_STATE, ...(input ?? {}) });
   state.asked = [...new Set(state.asked)];
+  state.languages = [...new Set(state.languages ?? [])];
   delete state.unsure;
   return state;
 }

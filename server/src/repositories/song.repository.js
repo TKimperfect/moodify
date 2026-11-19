@@ -7,15 +7,28 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SONGS as SAMPLE_SONGS } from '../data/songs.js';
-import { MOOD_IDS, EFFECT_IDS, GENRE_IDS } from '../data/taxonomy.js';
+import { MOOD_IDS, EFFECT_IDS, GENRE_IDS, SONG_LANGUAGE_IDS } from '../data/taxonomy.js';
 import { getPublicClient, isSupabaseConfigured } from '../lib/supabase.js';
 import { withPlayback } from '../services/music/music.service.js';
 
-const CACHE_MS = 60_000;
+// The whole catalogue (100,000+ songs, about 70 MB) is read when the server
+// starts and then every 6 hours, in the background. Songs only change when you
+// run an import, so reading more often would just use up Supabase's free
+// monthly data allowance. SONGS_CACHE_MINUTES in server/.env changes it.
+const CACHE_MS = Math.max(1, Number(process.env.SONGS_CACHE_MINUTES) || 360) * 60_000;
+const RETRY_MS = 60_000;
 const BASE_COLUMNS = 'id,title,artist,genres,moods,effects,energy,intensity,bpm,tempo,popularity,year,provider,external_url,preview_url';
 const MUSIC_COLUMNS = `${BASE_COLUMNS},artwork_url,album,duration_s,license_url`;
+const LANGUAGE_COLUMNS = `${MUSIC_COLUMNS},language,youtube_id,youtube_checked_at,mood_source`;
+// Newest first; older databases (migrations not run yet) fall back step by step.
+const COLUMN_SETS = [LANGUAGE_COLUMNS, MUSIC_COLUMNS, BASE_COLUMNS];
 const here = path.dirname(fileURLToPath(import.meta.url));
-export const IMPORTED_FILE = path.join(here, '..', '..', 'data', 'jamendo-catalog.json');
+const DATA_DIR = path.join(here, '..', '..', 'data');
+// Later files win when the same song appears twice: the research datasets
+// (MTG-Jamendo, MuSe) have better mood information than the earlier guesses.
+export const IMPORTED_FILES = ['jamendo-catalog.json', 'deezer-catalog.json', 'mtg-catalog.json', 'muse-catalog.json'].map((name) =>
+  path.join(DATA_DIR, name),
+);
 
 const isText = (value) => typeof value === 'string' && value.length > 0;
 const isLevel = (value) => Number.isInteger(value) && value >= 0 && value <= 100;
@@ -35,11 +48,12 @@ function isValidImported(song) {
     isLevel(song.intensity) &&
     Number.isInteger(song.bpm) &&
     ['slow', 'medium', 'fast'].includes(song.tempo) &&
+    (song.language === undefined || song.language === null || SONG_LANGUAGE_IDS.includes(song.language)) &&
     (song.preview_url === null || /^https:\/\//.test(song.preview_url))
   );
 }
 
-export function loadImportedSongs(file = IMPORTED_FILE) {
+export function loadImportedSongs(file) {
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(file, 'utf8'));
@@ -53,11 +67,15 @@ export function loadImportedSongs(file = IMPORTED_FILE) {
   return songs;
 }
 
+// Joins song lists; when a song appears more than once, the later list wins.
+export function mergeSongs(...lists) {
+  const byId = new Map();
+  for (const song of lists.flat()) byId.set(song.id, song);
+  return [...byId.values()];
+}
+
 function localCatalogue() {
-  const seen = new Set();
-  return [...SAMPLE_SONGS, ...loadImportedSongs()]
-    .filter((song) => !seen.has(song.id) && seen.add(song.id))
-    .map(withPlayback);
+  return mergeSongs(SAMPLE_SONGS, ...IMPORTED_FILES.map((file) => loadImportedSongs(file))).map(withPlayback);
 }
 
 // Makes a database row look exactly like a song from the sample file.
@@ -82,28 +100,70 @@ export function toSong(row) {
     album: row.album ?? null,
     duration_s: row.duration_s ?? null,
     license_url: row.license_url ?? null,
+    language: row.language ?? (row.provider === 'sample' || !row.provider ? 'instrumental' : null),
+    youtube_id: row.youtube_id ?? null,
+    youtube_checked_at: row.youtube_checked_at ?? null,
+    mood_source: row.mood_source ?? null,
   });
 }
 
 let LOCAL = localCatalogue();
 let cache = { songs: LOCAL, source: 'local', loadedAt: 0, problem: null, note: null };
 
+// Supabase returns at most 1000 rows per request, so read page by page,
+// a few pages at a time (100,000 songs = 100 pages).
+const PAGE = 1000;
+const MAX_SONGS = 200_000;
+const PAGES_AT_ONCE = 4;
 async function selectSongs(columns) {
-  return getPublicClient().from('songs').select(columns).limit(5000);
+  const page = (from, count) => {
+    const query = getPublicClient().from('songs').select(columns, count ? { count: 'exact' } : undefined);
+    return query.order('id').range(from, from + PAGE - 1);
+  };
+  const first = await page(0, true);
+  if (first.error) return { data: null, error: first.error };
+  const all = [...first.data];
+  const total = Math.min(MAX_SONGS, first.count ?? (first.data.length < PAGE ? first.data.length : MAX_SONGS));
+  let from = PAGE;
+  while (from < total) {
+    const starts = [];
+    for (let i = 0; i < PAGES_AT_ONCE && from < total; i += 1, from += PAGE) starts.push(from);
+    const results = await Promise.all(starts.map((start) => page(start)));
+    for (const result of results) {
+      if (result.error) return { data: null, error: result.error };
+      all.push(...result.data);
+    }
+    if (results.at(-1).data.length < PAGE) break; // fewer songs than counted
+  }
+  return { data: all, error: null };
 }
 
-async function load() {
+let loading = null;
+async function load({ wait = false } = {}) {
   if (!isSupabaseConfigured) return cache;
   if (cache.loadedAt && Date.now() - cache.loadedAt < CACHE_MS) return cache;
+  // One read at a time, however many requests arrive meanwhile.
+  loading ??= readDatabase().finally(() => {
+    loading = null;
+  });
+  // Songs already read from the database keep being used while the new copy loads.
+  if (cache.source === 'supabase' && !wait) return cache;
+  return loading;
+}
 
+async function readDatabase() {
   let problem = null;
   try {
     let note = null;
-    let { data, error } = await selectSongs(MUSIC_COLUMNS);
-    if (error?.code === '42703') {
-      // The Phase 7 migration has not been run yet: read the older columns.
-      note = 'Run supabase/migrations/002_music_sources.sql to enable cover art and licences for imported songs';
-      ({ data, error } = await selectSongs(BASE_COLUMNS));
+    let data;
+    let error;
+    for (const [index, columns] of COLUMN_SETS.entries()) {
+      ({ data, error } = await selectSongs(columns));
+      if (error?.code !== '42703') break;
+      // A migration has not been run yet: try the older set of columns.
+      note = index === 0
+        ? 'Run supabase/migrations/003_languages_youtube.sql to enable song languages and YouTube'
+        : 'Run supabase/migrations/002_music_sources.sql and 003_languages_youtube.sql';
     }
     if (error) problem = `Database error: ${error.message}`;
     else if (data.length === 0) problem = 'The songs table is empty (run: npm run db:seed)';
@@ -115,9 +175,27 @@ async function load() {
     problem = `Cannot reach the database: ${error.message}`;
   }
 
+  if (cache.source === 'supabase' && !/is empty/.test(problem)) {
+    // The database could not be read this time: keep the songs we have and
+    // try again in a minute.
+    console.warn(`[songs] ${problem}. Keeping the songs already loaded.`);
+    cache = { ...cache, problem, loadedAt: Date.now() - CACHE_MS + RETRY_MS };
+    return cache;
+  }
   if (cache.problem !== problem) console.warn(`[songs] ${problem}. Using built-in sample songs.`);
   cache = { songs: LOCAL, source: 'local', loadedAt: Date.now(), problem, note: null };
   return cache;
+}
+
+// A lookup table per loaded catalogue (fast even with many songs).
+const lookups = new WeakMap();
+function byIdFor(loaded) {
+  let table = lookups.get(loaded.songs);
+  if (!table) {
+    table = new Map(loaded.songs.map((song) => [song.id, song]));
+    lookups.set(loaded.songs, table);
+  }
+  return table;
 }
 
 export const songRepository = {
@@ -126,28 +204,33 @@ export const songRepository = {
   },
 
   async findById(id) {
-    return (await load()).songs.find((song) => song.id === id) ?? null;
+    return byIdFor(await load()).get(id) ?? null;
   },
 
   async findByIds(ids) {
-    const byId = new Map((await load()).songs.map((song) => [song.id, song]));
+    const byId = byIdFor(await load());
     return ids.map((id) => byId.get(id)).filter(Boolean);
   },
 
   // Used by the health check.
   async status({ fresh = false } = {}) {
     if (fresh) cache.loadedAt = 0;
-    const { songs, source, problem, note } = await load();
+    const { songs, source, problem, note } = await load({ wait: fresh });
     return {
       configured: isSupabaseConfigured,
       source,
       songs: songs.length,
+      by_language: songs.reduce((counts, song) => ({ ...counts, [song.language ?? 'unknown']: (counts[song.language ?? 'unknown'] ?? 0) + 1 }), {}),
       by_provider: songs.reduce((counts, song) => ({ ...counts, [song.provider ?? 'sample']: (counts[song.provider ?? 'sample'] ?? 0) + 1 }), {}),
       problem: problem ?? note,
     };
   },
 
-  // Re-reads the imported songs file (used by tests).
+  usesDatabase() {
+    return cache.source === 'supabase';
+  },
+
+  // Re-reads the imported songs files (used by tests).
   reloadLocal() {
     LOCAL = localCatalogue();
     cache = { songs: LOCAL, source: 'local', loadedAt: 0, problem: null, note: null };

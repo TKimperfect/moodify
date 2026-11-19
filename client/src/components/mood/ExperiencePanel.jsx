@@ -3,10 +3,15 @@ import Choice from '../ui/Choice.jsx';
 import { useMoodProfile } from '../../context/MoodProfileContext.jsx';
 import { suggestedEffects } from '../../lib/moodProfile.js';
 import { DESIRED_EFFECTS, GENRES } from '../../data/spectrum.js';
+import { LANGUAGES } from '../../data/languages.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 // Step 03: what the music should do, plus optional genres.
 export default function ExperiencePanel() {
-  const { draft, setField, toggleGenre } = useMoodProfile();
+  const { draft, setField, toggleGenre, toggleLanguage } = useMoodProfile();
+  const { user } = useAuth();
+  const favourites = LANGUAGES.filter((language) => user?.favorite_languages?.includes(language.id));
+  const chosen = draft.languages ?? [];
   const suggested = suggestedEffects(draft.moods);
 
   return (
@@ -60,6 +65,33 @@ export default function ExperiencePanel() {
               />
             ))}
           </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="font-medium text-frost">
+            Song language <span className="text-sm font-normal text-silver">(optional, pick any)</span>
+          </legend>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {LANGUAGES.map((language) => (
+              <Choice
+                key={language.id}
+                type="checkbox"
+                name="languages"
+                value={language.id}
+                label={language.native === language.label ? language.label : `${language.native} · ${language.label}`}
+                checked={chosen.includes(language.id)}
+                onChange={() => toggleLanguage(language.id)}
+                className="choice-compact"
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-silver">
+            {chosen.length > 0
+              ? 'Only songs in these languages. Instrumental music fills in when there are too few.'
+              : favourites.length > 0
+                ? `Nothing chosen: your profile languages are used (${favourites.map((language) => language.label).join(', ')}).`
+                : 'Nothing chosen: songs in any language.'}
+          </p>
         </fieldset>
       </div>
     </Window>

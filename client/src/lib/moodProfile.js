@@ -10,11 +10,13 @@ import {
   ENERGY_WORDS,
   INTENSITY_WORDS,
 } from '../data/spectrum.js';
+import { LANGUAGES } from '../data/languages.js';
 
 const MOOD_IDS = MOODS.map((mood) => mood.id);
 const EFFECT_IDS = DESIRED_EFFECTS.map((effect) => effect.id);
 const TEMPO_IDS = TEMPOS.map((tempo) => tempo.id);
 const GENRE_IDS = GENRES.map((genre) => genre.id);
+const LANGUAGE_IDS = LANGUAGES.map((language) => language.id);
 
 // What the screen looks like before the user touches anything.
 export const DEFAULT_DRAFT = Object.freeze({
@@ -24,6 +26,7 @@ export const DEFAULT_DRAFT = Object.freeze({
   tempo: 'any',
   desiredEffect: null,
   genres: [],
+  languages: [], // empty = any language (or the favourites saved in the profile)
   spectrumTouched: false, // true once the user moves a slider themselves
 });
 
@@ -72,6 +75,7 @@ export function buildProfile(draft) {
     genres: GENRE_IDS.filter((id) => draft.genres.includes(id)),
     desired_effect: draft.desiredEffect,
     tempo: draft.tempo,
+    languages: LANGUAGE_IDS.filter((id) => (draft.languages ?? []).includes(id)),
   };
 }
 
@@ -89,6 +93,7 @@ export function sanitizeProfile(input) {
     genres: Array.isArray(input.genres) ? GENRE_IDS.filter((id) => input.genres.includes(id)) : [],
     desired_effect: input.desired_effect,
     tempo: TEMPO_IDS.includes(input.tempo) ? input.tempo : 'any',
+    languages: Array.isArray(input.languages) ? LANGUAGE_IDS.filter((id) => input.languages.includes(id)) : [],
   };
 }
 
@@ -101,6 +106,7 @@ export function draftFromProfile(profile) {
     tempo: profile.tempo,
     desiredEffect: profile.desired_effect,
     genres: profile.genres,
+    languages: profile.languages ?? [],
     spectrumTouched: true,
   };
 }
@@ -121,6 +127,8 @@ export function summarizeProfile(profile) {
   ];
   let sentence = `${parts.join(', ')}. Wants music to "${effect.label.toLowerCase()}"`;
   sentence += profile.tempo === 'any' ? ', any tempo' : `, ${profile.tempo} tempo`;
-  sentence += genreLabels.length > 0 ? `, leaning ${joinWords(genreLabels)}.` : ', open to any genre.';
+  sentence += genreLabels.length > 0 ? `, leaning ${joinWords(genreLabels)}` : ', open to any genre';
+  const languageLabels = LANGUAGES.filter((language) => (profile.languages ?? []).includes(language.id)).map((language) => language.label);
+  sentence += languageLabels.length > 0 ? `, sung in ${joinWords(languageLabels)}.` : '.';
   return sentence;
 }

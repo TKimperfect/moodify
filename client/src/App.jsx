@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx';
 import Library from './pages/Library.jsx';
 import PlaylistDetail from './pages/PlaylistDetail.jsx';
 import Profile from './pages/Profile.jsx';
+import Credits from './pages/Credits.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 // The list of pages. Every page is drawn inside AppShell (header + footer).
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="login" element={<Login mode="login" />} />
         <Route path="register" element={<Login mode="register" />} />
+        <Route path="credits" element={<Credits />} />
         <Route path="status" element={<SystemCheck />} />
         <Route path="*" element={<NotFound />} />
       </Route>

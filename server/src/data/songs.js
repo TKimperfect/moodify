@@ -115,5 +115,7 @@ export const SONGS = ROWS.map(
       tempo: tempoOf(bpm),
       popularity,
       year,
+      // The generated sample audio has no singing.
+      language: 'instrumental',
     }),
 );

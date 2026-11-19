@@ -164,7 +164,21 @@ try {
   check('delete mood session', (await call('DELETE', `/mood-sessions/${sessionId}`, { token: a.token })).status === 204);
   check('log out', (await call('POST', '/auth/logout', { token: a.token })).status === 204);
 
-  console.log('\n9. Deleting an account removes all of its data');
+  console.log('\n9. Song languages');
+  const langSession = await call('POST', '/mood-sessions', { token: a.token, body: { profile: { ...profile, languages: ['yue', 'ms'] } } });
+  check('mood sessions keep their languages', langSession.json?.mood_session?.languages?.join() === 'yue,ms', langSession.error ?? 'Run supabase/migrations/003_languages_youtube.sql');
+  const langProfile = await call('PATCH', '/auth/me', { token: a.token, body: { favorite_languages: ['zh', 'ko'] } });
+  check('favourite languages are saved', langProfile.json?.profile?.favorite_languages?.join() === 'zh,ko', langProfile.error ?? 'Run supabase/migrations/003_languages_youtube.sql');
+  const langRecs = await call('POST', '/recommendations', { token: a.token, body: { profile: { ...profile, genres: [] } } });
+  check('favourite languages are used when none are chosen', langRecs.json?.used_favorite_languages === true && langRecs.json?.meta?.languages?.join() === 'zh,ko', langRecs.error);
+  const songsByLanguage = health.json?.database?.by_language ?? {};
+  check(
+    `songs have languages (${Object.entries(songsByLanguage).map(([id, count]) => `${id} ${count}`).join(', ')})`,
+    !('unknown' in songsByLanguage) || songsByLanguage.unknown === 0,
+    'Some songs have no language: run npm run db:seed and the music imports again after migration 003',
+  );
+
+  console.log('\n10. Deleting an account removes all of its data');
   const sessionB = await call('POST', '/mood-sessions', { token: b.token, body: { profile } });
   await call('PUT', `/favorites/${s1}`, { token: b.token });
   check('delete needs typed confirmation', (await call('DELETE', '/auth/me', { token: b.token, body: {} })).status === 400);

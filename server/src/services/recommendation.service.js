@@ -10,6 +10,7 @@ const merge = (a, b) => [...new Set([...a, ...b])];
 export async function getRecommendations({ profile, feedback, limit }, db = null) {
   let { liked, rejected, skipped } = feedback;
   let usedFavoriteGenres = false;
+  let usedFavoriteLanguages = false;
 
   // Logged-in users: add what the database remembers about their taste.
   if (db) {
@@ -18,7 +19,12 @@ export async function getRecommendations({ profile, feedback, limit }, db = null
         listFavoriteIds(db),
         listRejectedIds(db),
         listSkippedIds(db),
-        db.from('profiles').select('favorite_genres').maybeSingle().then(unwrap),
+        db
+          .from('profiles')
+          .select('favorite_genres,favorite_languages')
+          .maybeSingle()
+          .then((result) => (result.error?.code === '42703' ? db.from('profiles').select('favorite_genres').maybeSingle() : result))
+          .then(unwrap),
       ]);
       liked = merge(liked, favoriteIds);
       rejected = merge(rejected, rejectedIds);
@@ -28,6 +34,11 @@ export async function getRecommendations({ profile, feedback, limit }, db = null
         profile = { ...profile, genres: account.favorite_genres };
         usedFavoriteGenres = true;
       }
+      // Same for languages.
+      if ((profile.languages ?? []).length === 0 && account?.favorite_languages?.length) {
+        profile = { ...profile, languages: account.favorite_languages };
+        usedFavoriteLanguages = true;
+      }
     } catch (error) {
       console.warn('Could not load saved feedback, continuing without it:', error.message);
     }
@@ -35,5 +46,5 @@ export async function getRecommendations({ profile, feedback, limit }, db = null
 
   const songs = await songRepository.findAll();
   const result = recommend({ profile, songs, feedback: { liked, rejected, recent: feedback.recent, skipped }, limit });
-  return { ...result, used_favorite_genres: usedFavoriteGenres };
+  return { ...result, used_favorite_genres: usedFavoriteGenres, used_favorite_languages: usedFavoriteLanguages };
 }

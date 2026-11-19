@@ -15,11 +15,12 @@ function repeatPenalty(songId, recent) {
   return position < 10 ? 0.25 : 0.12;
 }
 
-function rank(profile, songs, taste, recent) {
+function rank(profile, songs, taste, recent, fill = new Set()) {
   return songs
     .map((song) => {
       const { parts, total } = scoreSong(profile, song, taste);
-      return { song, parts, total, adjusted: total - repeatPenalty(song.id, recent) };
+      const fillPenalty = fill.has(song.id) ? 0.2 : 0;
+      return { song, parts, total, adjusted: total - repeatPenalty(song.id, recent) - fillPenalty };
     })
     .sort((a, b) => b.adjusted - a.adjusted || b.song.popularity - a.song.popularity);
 }
@@ -71,16 +72,31 @@ export function recommend({ profile, songs, feedback = {}, limit = 10 }) {
   );
 
   // Rejected songs are never recommended again.
-  const candidates = songs.filter((song) => !rejected.has(song.id));
+  let candidates = songs.filter((song) => !rejected.has(song.id));
 
-  const ranked = rank(profile, candidates, taste, recent);
+  // Languages: only songs sung in the chosen languages. If there are too few
+  // for a full list, instrumental songs (no singing) fill the gap, ranked lower.
+  const languages = profile.languages ?? [];
+  let fill = new Set();
+  if (languages.length > 0) {
+    const sung = candidates.filter((song) => languages.includes(song.language));
+    if (sung.length < limit * 2) {
+      const instrumental = candidates.filter((song) => song.language === 'instrumental');
+      fill = new Set(instrumental.map((song) => song.id));
+      candidates = [...sung, ...instrumental];
+    } else {
+      candidates = sung;
+    }
+  }
+
+  const ranked = rank(profile, candidates, taste, recent, fill);
   const { picked, passedOver } = pickDiverse(ranked, limit);
 
   // "A different direction": same person, contrasting wish.
   const altEffect = ALTERNATIVE_EFFECT[profile.desired_effect];
   const altProfile = { ...profile, desired_effect: altEffect };
   const mainIds = new Set(picked.map((entry) => entry.song.id));
-  const altRanked = rank(altProfile, candidates.filter((song) => !mainIds.has(song.id)), taste, recent);
+  const altRanked = rank(altProfile, candidates.filter((song) => !mainIds.has(song.id)), taste, recent, fill);
   const altPicked = pickDiverse(altRanked, ALTERNATIVE_SIZE).picked;
 
   return {
@@ -96,6 +112,8 @@ export function recommend({ profile, songs, feedback = {}, limit = 10 }) {
     },
     meta: {
       catalogue_size: songs.length,
+      languages,
+      instrumental_fill: picked.some((entry) => fill.has(entry.song.id)),
       weights: WEIGHTS,
       learned_from: taste.samples,
     },

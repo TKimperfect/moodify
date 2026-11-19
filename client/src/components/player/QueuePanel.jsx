@@ -47,6 +47,16 @@ export default function QueuePanel({ onClose }) {
         <button type="button" className={`btn-ghost px-3 py-1.5 ${player.repeat !== 'off' ? 'border-orchid text-orchid' : ''}`} onClick={player.cycleRepeat}>
           Repeat {player.repeat === 'one' ? 'one' : player.repeat}
         </button>
+        {player.youtube.available && (
+          <button
+            type="button"
+            className={`btn-ghost px-3 py-1.5 ${player.youtube.fullSongs ? 'border-orchid text-orchid' : ''}`}
+            aria-pressed={player.youtube.fullSongs}
+            onClick={() => player.setFullSongs(!player.youtube.fullSongs)}
+          >
+            Full songs {player.youtube.fullSongs ? 'on' : 'off'}
+          </button>
+        )}
         <button type="button" className="btn-ghost ml-auto px-3 py-1.5" onClick={player.clearQueue} disabled={entries.length === 0}>
           Clear
         </button>

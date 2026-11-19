@@ -1,6 +1,6 @@
 {
   "name": "moodify-server",
-  "version": "1.0.0",
+  "version": "1.2.8",
   "private": true,
   "type": "module",
   "engines": {
@@ -12,7 +12,11 @@
     "test": "node --test",
     "db:seed": "node scripts/seed.js",
     "db:check": "node scripts/supabase-check.js",
-    "music:import": "node scripts/import-jamendo.js"
+    "music:import": "node scripts/import-jamendo.js",
+    "music:prune-languages": "node scripts/prune-deezer.js",
+    "music:import-languages": "node scripts/import-deezer.js",
+    "music:import-mtg": "node scripts/import-mtg.js",
+    "music:import-muse": "node scripts/import-muse.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",

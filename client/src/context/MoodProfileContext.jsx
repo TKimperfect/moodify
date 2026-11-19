@@ -68,6 +68,13 @@ export function MoodProfileProvider({ children }) {
     }));
   }, []);
 
+  const toggleLanguage = useCallback((id) => {
+    setDraft((current) => {
+      const list = current.languages ?? [];
+      return { ...current, languages: list.includes(id) ? list.filter((item) => item !== id) : [...list, id] };
+    });
+  }, []);
+
   const resetDraft = useCallback(() => setDraft(DEFAULT_DRAFT), []);
 
   // Stores the finished profile in the browser. Returns false if incomplete.
@@ -121,13 +128,14 @@ export function MoodProfileProvider({ children }) {
       useSuggestedSpectrum,
       setField,
       toggleGenre,
+      toggleLanguage,
       resetDraft,
       saveProfile,
       applyProfile,
       loadIntoEditor,
       clearSaved,
     }),
-    [draft, saved, setMoods, setSpectrum, useSuggestedSpectrum, setField, toggleGenre, resetDraft, saveProfile, applyProfile, loadIntoEditor, clearSaved],
+    [draft, saved, setMoods, setSpectrum, useSuggestedSpectrum, setField, toggleGenre, toggleLanguage, resetDraft, saveProfile, applyProfile, loadIntoEditor, clearSaved],
   );
 
   return <MoodProfileContext.Provider value={value}>{children}</MoodProfileContext.Provider>;

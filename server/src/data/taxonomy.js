@@ -142,3 +142,41 @@ export const MOOD_LABELS = {
   happy: 'Happy', sad: 'Sad', lonely: 'Lonely', angry: 'Angry', anxious: 'Anxious',
   calm: 'Calm', nostalgic: 'Nostalgic', motivated: 'Motivated', empty: 'Empty', romantic: 'Romantic',
 };
+
+// Languages a song can be sung in. "instrumental" has no vocals and fits any
+// language choice; "other" is a language MOODIFY does not offer as a filter.
+export const LANGUAGES = {
+  en: 'English',
+  ms: 'Malay',
+  zh: 'Mandarin',
+  yue: 'Cantonese',
+  nan: 'Taiwanese Hokkien',
+  ko: 'Korean',
+  ja: 'Japanese',
+};
+export const LANGUAGE_IDS = Object.keys(LANGUAGES);
+export const SONG_LANGUAGE_IDS = [...LANGUAGE_IDS, 'instrumental', 'other'];
+
+// Shared rules for songs whose moods are known but whose energy, effects and
+// tempo must be estimated (imported songs).
+export function deriveFromMoods(moods, { energy: knownEnergy, strong = false, soft = false } = {}) {
+  const hints = moods.map((mood) => MOOD_HINTS[mood]);
+  const average = (key) => hints.reduce((sum, hint) => sum + hint[key], 0) / hints.length;
+  const energy = Math.round(knownEnergy ?? average('energy'));
+  let intensity = average('intensity');
+  if (strong) intensity += 15;
+  if (soft) intensity -= 15;
+  const effects = moods.flatMap((mood) => MOOD_HINTS[mood].effects);
+  if (energy >= 70) effects.unshift('energize');
+  if (moods.includes('angry')) effects.unshift('release');
+  if (energy <= 30) effects.push('atmosphere');
+  // Rough tempo from energy: 25 -> 81 BPM (slow), 50 -> 103 (medium), 80 -> 128 (fast).
+  const bpm = Math.round(60 + energy * 0.85);
+  return {
+    energy: Math.min(100, Math.max(0, energy)),
+    intensity: Math.min(100, Math.max(0, Math.round(intensity))),
+    effects: [...new Set(effects)].slice(0, 3),
+    bpm,
+    tempo: tempoOf(bpm),
+  };
+}

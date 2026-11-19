@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useApi } from '../lib/useApi.js';
 import { GENRES, DESIRED_EFFECTS } from '../data/spectrum.js';
 import { MOODS } from '../data/moods.js';
+import { LANGUAGES } from '../data/languages.js';
 import { removeKey } from '../lib/storage.js';
 
 export default function Profile() {
@@ -96,18 +97,22 @@ function AccountDetails() {
 function MusicPreferences() {
   const { user, updateProfile } = useAuth();
   const [genres, setGenres] = useState(user.favorite_genres);
+  const [languages, setLanguages] = useState(user.favorite_languages ?? []);
   const [state, setState] = useState(null);
-  const changed = [...genres].sort().join() !== [...user.favorite_genres].sort().join();
+  const same = (a, b) => [...a].sort().join() === [...b].sort().join();
+  const changed = !same(genres, user.favorite_genres) || !same(languages, user.favorite_languages ?? []);
 
-  const toggle = (id) => {
+  const toggleIn = (setList) => (id) => {
     setState(null);
-    setGenres((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
+    setList((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
   };
+  const toggle = toggleIn(setGenres);
+  const toggleLanguage = toggleIn(setLanguages);
 
   async function save() {
     try {
-      await updateProfile({ favorite_genres: genres });
-      setState({ text: 'Saved. These are used whenever you do not pick genres for a mood.' });
+      await updateProfile({ favorite_genres: genres, favorite_languages: languages });
+      setState({ text: 'Saved. These are used whenever you do not pick genres or languages for a mood.' });
     } catch (error) {
       setState({ error: error.message });
     }
@@ -122,6 +127,23 @@ function MusicPreferences() {
           <div className="mt-3 flex flex-wrap gap-2">
             {GENRES.map((genre) => (
               <Choice key={genre.id} type="checkbox" name="favorite-genres" value={genre.id} label={genre.label} checked={genres.includes(genre.id)} onChange={() => toggle(genre.id)} className="choice-compact" />
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend className="text-sm text-silver">Languages you listen to. When you don't choose a language for a mood, songs come from these.</legend>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {LANGUAGES.map((language) => (
+              <Choice
+                key={language.id}
+                type="checkbox"
+                name="favorite-languages"
+                value={language.id}
+                label={language.native === language.label ? language.label : `${language.native} · ${language.label}`}
+                checked={languages.includes(language.id)}
+                onChange={() => toggleLanguage(language.id)}
+                className="choice-compact"
+              />
             ))}
           </div>
         </fieldset>

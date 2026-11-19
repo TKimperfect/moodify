@@ -36,7 +36,15 @@ test('builds the structured profile from the spec example', () => {
     genres: ['indie', 'alternative'],
     desired_effect: 'comfort',
     tempo: 'slow',
+    languages: [],
   });
+});
+
+test('languages are kept in a fixed order and unknown ones are dropped', () => {
+  const profile = buildProfile({ ...DEFAULT_DRAFT, moods: ['sad'], desiredEffect: 'comfort', languages: ['ko', 'yue', 'xx'] });
+  assert.deepEqual(profile.languages, ['yue', 'ko']);
+  assert.deepEqual(sanitizeProfile({ ...profile, languages: ['ms', 'nope'] }).languages, ['ms']);
+  assert.match(summarizeProfile({ ...profile, languages: ['yue', 'ko'] }), /sung in Cantonese and Korean\.$/);
 });
 
 test('the same mood can carry different desired effects', () => {
@@ -72,12 +80,12 @@ test('sanitizeProfile rejects bad data and cleans good data', () => {
   assert.equal(sanitizeProfile({ moods: ['sad'], desired_effect: 'hack' }), null);
   assert.deepEqual(
     sanitizeProfile({ moods: ['sad', 'x'], desired_effect: 'comfort', energy: '30', intensity: 999, genres: ['indie', '<b>'], tempo: 'warp' }),
-    { moods: ['sad'], energy: 30, intensity: 100, genres: ['indie'], desired_effect: 'comfort', tempo: 'any' },
+    { moods: ['sad'], energy: 30, intensity: 100, genres: ['indie'], desired_effect: 'comfort', tempo: 'any', languages: [] },
   );
 });
 
 test('a profile survives a round trip through the editor state', () => {
-  const profile = { moods: ['nostalgic'], energy: 40, intensity: 55, genres: [], desired_effect: 'memories', tempo: 'medium' };
+  const profile = { moods: ['nostalgic'], energy: 40, intensity: 55, genres: [], desired_effect: 'memories', tempo: 'medium', languages: ['ja'] };
   assert.deepEqual(buildProfile(draftFromProfile(profile)), profile);
 });
 
