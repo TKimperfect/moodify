@@ -21,8 +21,10 @@ export async function saveCatalog(name, source, allSongs) {
     return;
   }
   const db = createAdminClient();
-  for (let i = 0; i < songs.length; i += 500) {
-    const { error } = await db.from('songs').upsert(songs.slice(i, i + 500), { onConflict: 'id' });
+  // "found_in" (where a song was found) is kept in the local file only.
+  const rows = songs.map(({ found_in: _foundIn, ...song }) => song);
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await db.from('songs').upsert(rows.slice(i, i + 500), { onConflict: 'id' });
     if (error) {
       console.error(`✗ Could not write to Supabase: ${error.message}`);
       if (/column|schema cache/i.test(error.message)) console.error('  Run supabase/migrations/003_languages_youtube.sql in the Supabase SQL Editor first.');

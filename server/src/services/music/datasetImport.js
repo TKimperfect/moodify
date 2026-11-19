@@ -5,7 +5,7 @@ import { env } from '../../config/env.js';
 import { HttpError } from '../../lib/httpError.js';
 import { fetchJson } from './providers/http.js';
 import { mapJamendoTrack, isJamendoConfigured } from './providers/jamendo.provider.js';
-import { fitsLanguage } from './deezerCatalog.js';
+import { detectLanguage } from './language.js';
 import { MTG_TSV_URL, parseMtgTsv, pickTracks } from './datasets/mtgJamendo.js';
 import { MUSE_CSV_URLS, readMuse, pickMuse } from './datasets/muse.js';
 
@@ -103,12 +103,6 @@ export async function importMtgJamendo({ perMood = Infinity, tsvText, onProgress
 
 // ---- MuSe ------------------------------------------------------------------
 
-function languageFromScript(text) {
-  if (/[가-힯]/.test(text)) return 'ko';
-  if (/[぀-ヿ]/.test(text)) return 'ja';
-  if (/[一-鿿]/.test(text)) return 'zh';
-  return 'en'; // MuSe is mostly English-language music
-}
 
 
 // Looks a MuSe song up on Deezer. Returns { track } when found, or
@@ -221,29 +215,29 @@ export async function importMuse({ perMood = Infinity, csvText, progress = new M
     checked += 1;
     let song = null;
     if (track?.id) {
-      const language = languageFromScript(`${track.title} ${track.artist?.name ?? ''}`);
-      if (fitsLanguage(language, `${track.title} ${track.artist?.name ?? ''}`)) {
-        stats.found += 1;
-        perMoodKept.set(mood, (perMoodKept.get(mood) ?? 0) + 1);
-        song = {
-          id: `deezer-${String(track.id).replace(/\D/g, '')}`,
-          title: String(track.title).slice(0, 200),
-          artist: String(track.artist?.name ?? row.artist).slice(0, 200),
-          genres: ['pop'],
-          ...row.mood,
-          popularity: Math.round(Math.min(100, (Math.log10(Number(track.rank ?? 0) + 1) / 6) * 100)),
-          year: null,
-          provider: 'deezer',
-          external_url: track.link ?? null,
-          preview_url: null,
-          artwork_url: track.album?.cover_medium ?? null,
-          album: track.album?.title ?? null,
-          duration_s: Number(track.duration) || null,
-          license_url: null,
-          language,
-          mood_source: 'muse',
-        };
-      }
+      // MuSe is mostly English-language music; "npm run music:relabel-languages"
+      // refines this with what the other imports know about each artist.
+      const language = detectLanguage({ title: String(track.title ?? ''), artist: String(track.artist?.name ?? row.artist) });
+      stats.found += 1;
+      perMoodKept.set(mood, (perMoodKept.get(mood) ?? 0) + 1);
+      song = {
+        id: `deezer-${String(track.id).replace(/\D/g, '')}`,
+        title: String(track.title).slice(0, 200),
+        artist: String(track.artist?.name ?? row.artist).slice(0, 200),
+        genres: ['pop'],
+        ...row.mood,
+        popularity: Math.round(Math.min(100, (Math.log10(Number(track.rank ?? 0) + 1) / 6) * 100)),
+        year: null,
+        provider: 'deezer',
+        external_url: track.link ?? null,
+        preview_url: null,
+        artwork_url: track.album?.cover_medium ?? null,
+        album: track.album?.title ?? null,
+        duration_s: Number(track.duration) || null,
+        license_url: null,
+        language,
+        mood_source: 'muse',
+      };
     }
     progress.set(key, song); // null = checked, not on Deezer
     if (!firstReported && stats.found + stats['no-results'] + stats.mismatch >= 20) {

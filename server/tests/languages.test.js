@@ -92,21 +92,26 @@ const song = (id, language, extra = {}) => ({
 });
 const profile = { moods: ['sad'], energy: 25, intensity: 70, genres: [], desired_effect: 'comfort', tempo: 'any' };
 
-test('writing systems keep obviously wrong-language songs out', () => {
-  assert.equal(fitsLanguage('yue', '富士山下 陳奕迅'), true);
-  assert.equal(fitsLanguage('yue', '사랑해 아이유'), false);
-  assert.equal(fitsLanguage('ko', '사랑해 아이유'), true);
-  assert.equal(fitsLanguage('ko', 'Dynamite BTS'), true);
-  assert.equal(fitsLanguage('ko', '残酷な天使のテーゼ'), false);
-  assert.equal(fitsLanguage('ja', '残酷な天使のテーゼ'), true);
-  assert.equal(fitsLanguage('ms', 'Sedih Siti Nurhaliza'), true);
-  assert.equal(fitsLanguage('ms', '富士山下'), false);
+test('each song gets the language it is sung in, not its playlist\'s', async () => {
+  const { scriptLanguage, detectLanguage } = await import('../src/services/music/language.js');
+  assert.equal(scriptLanguage('富士山下 陳奕迅', 'yue'), 'yue');
+  assert.equal(scriptLanguage('사랑해 아이유'), 'ko');
+  assert.equal(scriptLanguage('残酷な天使のテーゼ'), 'ja');
+  assert.equal(scriptLanguage('Dynamite BTS'), null);
+  assert.equal(detectLanguage({ title: 'Sedih', artist: 'Siti Nurhaliza', foundIn: ['ms'] }), 'ms');
+  assert.equal(detectLanguage({ title: 'Kau Ilhamku', artist: 'Man Bai', foundIn: ['en'] }), 'ms'); // Malay word
+  assert.equal(detectLanguage({ title: 'Je te laisserai des mots', artist: 'Patrick Watson', foundIn: ['ja'] }), 'other');
+  assert.equal(detectLanguage({ title: 'Give Me Everything', artist: 'Pitbull', foundIn: ['zh'] }, { western: new Set(['pitbull']) }), 'en');
+  assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'] }), 'ko'); // unknown artist: the playlist decides
 });
 
 test('the Deezer import builds language-tagged songs per mood', async () => {
   const { songs } = await importDeezerCatalog({ perMood: 10, languages: ['yue', 'ko'] });
   const ids = songs.map((item) => item.id).sort();
-  assert.deepEqual(ids, ['deezer-101', 'deezer-103', 'deezer-201']); // Korean and Japanese titles were filtered out
+  assert.deepEqual(ids, ['deezer-101', 'deezer-102', 'deezer-103', 'deezer-201', 'deezer-202']);
+  // A Korean song in a Cantonese playlist is Korean; a Japanese one in a Korean playlist is Japanese.
+  assert.equal(songs.find((item) => item.id === 'deezer-102').language, 'ko');
+  assert.equal(songs.find((item) => item.id === 'deezer-202').language, 'ja');
   const eason = songs.find((item) => item.id === 'deezer-101');
   assert.equal(eason.language, 'yue');
   assert.deepEqual(eason.moods, ['sad']);
@@ -156,7 +161,7 @@ test('imported Deezer songs load from a catalogue file', async () => {
   const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'moodify-')), 'deezer.json');
   writeFileSync(file, JSON.stringify({ songs }));
   const loaded = loadImportedSongs(file);
-  assert.equal(loaded.length, 2);
+  assert.equal(loaded.length, 3);
   const { withPlayback } = await import('../src/services/music/music.service.js');
   const playback = withPlayback(loaded[0]).playback;
   assert.equal(playback.audio_url, '/api/audio/deezer/101');
@@ -221,7 +226,7 @@ test('profiles and sessions accept only known languages', async () => {
 
 test('Discover lists languages and search filters by language', async () => {
   const discover = await (await fetch(`${baseUrl}/api/songs/discover`)).json();
-  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'zh', 'yue', 'nan', 'ko', 'ja', 'instrumental']);
+  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'zh', 'yue', 'nan', 'ko', 'ja', 'instrumental', 'other']);
   assert.equal(discover.languages.find((item) => item.id === 'instrumental').count, 70);
   const malay = await (await fetch(`${baseUrl}/api/songs?language=ms`)).json();
   assert.equal(malay.count, 0);
@@ -241,6 +246,12 @@ test('the import reports which searches it tried', async () => {
 
 test('without a limit, whole playlists are read page by page', async () => {
   const { songs } = await importDeezerCatalog({ languages: ['ko'] });
-  // The pretend Korean playlist has 2 songs, one in Japanese (filtered out).
-  assert.deepEqual(songs.map((item) => item.id), ['deezer-201']);
+  // The pretend Korean playlist has 2 songs; the Japanese one is labelled Japanese.
+  assert.deepEqual(songs.map((item) => [item.id, item.language]), [['deezer-201', 'ko'], ['deezer-202', 'ja']]);
+});
+
+test('the Deezer import: an artist known from Western music with a Latin title is English', async () => {
+  const { songs, changes } = await importDeezerCatalog({ languages: ['ko'], westernArtists: ['bts'] });
+  assert.equal(songs.find((item) => item.id === 'deezer-201').language, 'en');
+  assert.ok(changes.some((change) => change.from === 'ko' && change.to === 'en'));
 });

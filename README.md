@@ -169,6 +169,14 @@ Needs `JAMENDO_CLIENT_ID`. Downloads the tag file from GitHub and imports **ever
 npm run music:prune-languages
 ```
 
+Playlists mix languages, so each song gets the language it is really sung in, not its playlist's (`server/src/services/music/language.js`): Korean, Japanese or Chinese writing in the title or artist; the same artist's other songs; Malay words, or French / Spanish words and accents ("Other languages"); artists known from Western music (MuSe, English playlists) are English; otherwise, for an unknown artist with a Latin title, the language of the playlists the song was found in. The import prints how many songs got another language, with examples. Songs that also came from MuSe keep their MuSe moods.
+
+To fix the languages of songs that are already imported, without searching Deezer again (a few minutes):
+
+```bash
+npm run music:relabel-languages
+```
+
 After changing the language search words, songs from the old searches stay in Supabase. This shows how many there are; add `-- delete` to remove them. Songs anyone saved, rated or played are always kept.
 
 ```bash

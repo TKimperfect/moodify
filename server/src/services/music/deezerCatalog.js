@@ -1,9 +1,11 @@
 // Builds a catalogue of real songs in seven languages from Deezer playlists.
 // For each language and mood, it searches Deezer for a matching playlist
-// (e.g. "粤语 伤感", "lagu melayu sedih") and takes songs from it. The mood and
-// language come from the search; energy, tempo and effects are estimated.
+// (e.g. "粤语 伤感", "lagu melayu sedih") and takes songs from it. The mood comes
+// from the search; the language is worked out per song (language.js), because
+// playlists mix languages. Energy, tempo and effects are estimated.
 import { env } from '../../config/env.js';
 import { HttpError } from '../../lib/httpError.js';
+import { labelLanguages } from './language.js';
 import { deriveFromMoods } from '../../data/taxonomy.js';
 import { fetchJson } from './providers/http.js';
 
@@ -86,18 +88,8 @@ export const CATALOG_QUERIES = {
   },
 };
 
-// Writing systems, to drop songs that are clearly in another language.
-const HANGUL = /[가-힯ᄀ-ᇿ]/;
-const KANA = /[぀-ヿ]/;
-const HAN = /[一-鿿㐀-䶿]/;
-
-export function fitsLanguage(language, text) {
-  if (language === 'ko') return !KANA.test(text) && !(HAN.test(text) && !HANGUL.test(text));
-  if (language === 'ja') return !HANGUL.test(text);
-  if (['zh', 'yue', 'nan'].includes(language)) return !HANGUL.test(text) && !KANA.test(text);
-  return !HANGUL.test(text) && !KANA.test(text) && !HAN.test(text); // en, ms
-}
-
+// Which language each song is really in is decided at the end of the import
+// (see language.js), not by the playlist it came from.
 const popularityOf = (rank) => Math.round(Math.min(100, (Math.log10(Number(rank) + 1) / 6) * 100));
 
 export function mapCatalogTrack(track, { language, mood, genre }) {
@@ -170,7 +162,6 @@ async function tracksFor(language, mood, perMood) {
       for (const track of await playlistTracks(playlist.id)) {
         if (found.size >= perMood) break;
         if (!track?.id || track.readable === false || found.has(track.id)) continue;
-        if (!fitsLanguage(language, `${track.title} ${track.artist?.name ?? ''}`)) continue;
         found.set(track.id, mapCatalogTrack(track, { language, mood, genre: query.genre }));
         kept += 1;
       }
@@ -180,7 +171,7 @@ async function tracksFor(language, mood, perMood) {
   return { songs: [...found.values()], tried };
 }
 
-export async function importDeezerCatalog({ perMood = Infinity, languages = Object.keys(CATALOG_QUERIES), onProgress = () => {} } = {}) {
+export async function importDeezerCatalog({ perMood = Infinity, languages = Object.keys(CATALOG_QUERIES), westernArtists = [], onProgress = () => {} } = {}) {
   const byId = new Map();
   const failures = [];
   for (const language of languages) {
@@ -189,8 +180,10 @@ export async function importDeezerCatalog({ perMood = Infinity, languages = Obje
         const { songs, tried } = await tracksFor(language, mood, perMood);
         for (const song of songs) {
           const existing = byId.get(song.id);
-          if (existing) existing.moods = [...new Set([...existing.moods, mood])].slice(0, 3);
-          else byId.set(song.id, song);
+          if (existing) {
+            existing.moods = [...new Set([...existing.moods, mood])].slice(0, 3);
+            if (!existing.foundIn.includes(language)) existing.foundIn.push(language);
+          } else byId.set(song.id, { ...song, foundIn: [language] });
         }
         onProgress({ language, mood, found: songs.length, tried });
       } catch (error) {
@@ -199,5 +192,7 @@ export async function importDeezerCatalog({ perMood = Infinity, languages = Obje
       }
     }
   }
-  return { songs: [...byId.values()], failures };
+  // Now that every song is known: the language each one is really sung in.
+  const { songs, changes } = labelLanguages([...byId.values()], { extraWesternArtists: westernArtists });
+  return { songs, failures, changes };
 }

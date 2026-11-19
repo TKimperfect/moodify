@@ -26,6 +26,14 @@ try {
   process.exit(1);
 }
 
+// Songs that came from MuSe are kept too.
+try {
+  const muse = JSON.parse(await readFile(path.join(here, '..', 'data', 'muse-catalog.json'), 'utf8')).songs;
+  current.push(...muse.map((song) => song.id));
+} catch {
+  // no MuSe import
+}
+
 const db = createAdminClient();
 async function readAll(table, columns, filter = (query) => query) {
   const rows = [];

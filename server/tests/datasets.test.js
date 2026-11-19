@@ -311,3 +311,25 @@ test('MuSe: angry and sad songs exist even when dominance rises with valence', a
   assert.ok(counts.angry > counts.anxious * 0.5, JSON.stringify(counts));
   assert.ok(counts.sad > 0);
 });
+
+test('language labels: artists, playlists and MuSe decide together', async () => {
+  const { relabel } = await import('../scripts/languageLabels.js');
+  const song = (id, title, artist, language, extra = {}) => ({ id, title, artist, language, ...extra });
+  const deezer = [
+    song('deezer-1', '稻香', 'Jay Chou', 'zh'),
+    song('deezer-2', 'Mojito', 'Jay Chou', 'zh'), // same artist as a Chinese title
+    song('deezer-3', 'Give Me Everything', 'Pitbull', 'zh'), // known from MuSe
+    song('deezer-4', 'Hype Boy', 'NewJeans', 'ko'),
+    song('deezer-5', 'Clint Eastwood', 'Gorillaz', 'ja'),
+  ];
+  const muse = [song('deezer-5', 'Clint Eastwood', 'Gorillaz', 'en'), song('deezer-9', 'Hey Ya!', 'Pitbull', 'en')];
+  const result = relabel({ deezer, muse });
+  const language = (id) => [...result.deezer, ...result.muse].find((item) => item.id === id).language;
+  assert.equal(language('deezer-1'), 'zh');
+  assert.equal(language('deezer-2'), 'zh');
+  assert.equal(language('deezer-3'), 'en');
+  assert.equal(language('deezer-4'), 'ko');
+  assert.equal(language('deezer-5'), 'en');
+  assert.equal(result.deezer.length, 4); // the MuSe copy of deezer-5 is the one kept
+  assert.deepEqual(result.deezer[0].found_in, ['zh']);
+});

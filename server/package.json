@@ -1,6 +1,6 @@
 {
   "name": "moodify-server",
-  "version": "1.2.10",
+  "version": "1.2.12",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "db:seed": "node scripts/seed.js",
     "db:check": "node scripts/supabase-check.js",
     "music:import": "node scripts/import-jamendo.js",
+    "music:relabel-languages": "node scripts/relabel-languages.js",
     "music:prune-languages": "node scripts/prune-deezer.js",
     "music:import-languages": "node scripts/import-deezer.js",
     "music:import-mtg": "node scripts/import-mtg.js",
