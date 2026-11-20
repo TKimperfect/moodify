@@ -223,7 +223,7 @@ Also run `npm run music:import` again so Jamendo songs get their language too.
 
 ### 3. Full songs on YouTube (optional, free)
 
-Without this, Deezer songs play a 30-second preview. With it, they play in full in YouTube's own player, shown as a small video window (YouTube requires the player to stay visible). If YouTube has no suitable video, or the owner does not allow playing it on other sites, MOODIFY plays the preview instead and says why. Listeners can switch "Full songs" off in the player.
+Without this, Deezer songs play a 30-second preview. With it, they play in full in YouTube's own player, shown as a small video window (YouTube requires the player to stay visible). If YouTube has no suitable video, or the owner does not allow playing it on other sites, MOODIFY plays the preview instead and says why. Listeners can switch "Full songs" off in the player. The video window can be dragged anywhere by its title bar (or moved with the arrow keys); double-click the bar to put it back. The browser remembers where it was.
 
 1. Open https://console.cloud.google.com and create a project (e.g. `moodify`).
 2. **APIs & Services > Library**, search **YouTube Data API v3**, **Enable**.

@@ -2,6 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 import { usePlayer } from '../../context/PlayerContext.jsx';
 import { loadYouTubeApi, youtubeErrorMessage } from '../../lib/youtubeApi.js';
 
+// Where the listener last moved the window (kept in this browser only).
+const POSITION_KEY = 'moodify.youtubeWindow';
+function savedPosition() {
+  try {
+    const value = JSON.parse(localStorage.getItem(POSITION_KEY));
+    return Number.isFinite(value?.x) && Number.isFinite(value?.y) ? value : null;
+  } catch {
+    return null;
+  }
+}
+function savePosition(position) {
+  try {
+    if (position) localStorage.setItem(POSITION_KEY, JSON.stringify(position));
+    else localStorage.removeItem(POSITION_KEY);
+  } catch {
+    // private window or storage blocked: the position is simply not remembered
+  }
+}
+// Keeps the whole window on screen.
+function clamp(position, box) {
+  if (!position || !box) return position;
+  const maxX = Math.max(0, window.innerWidth - box.width);
+  const maxY = Math.max(0, window.innerHeight - box.height);
+  return { x: Math.min(Math.max(0, position.x), maxX), y: Math.min(Math.max(0, position.y), maxY) };
+}
+
 // YouTube's own player, shown while a full song plays.
 // YouTube's rules: the player must stay visible (at least 200x200 pixels),
 // so it is a small window above the player bar rather than hidden.
@@ -12,6 +38,61 @@ export default function YouTubeWindow() {
   const loadedId = useRef(null);
   const [problem, setProblem] = useState(null);
   const { videoId, events, wantPlay } = youtube;
+  const box = useRef(null);
+  const drag = useRef(null);
+  // null = the usual place (bottom left; under the header on phones).
+  const [position, setPosition] = useState(savedPosition);
+
+  // A remembered position must still fit when the window or screen changes size.
+  useEffect(() => {
+    const fit = () => setPosition((current) => clamp(current, box.current?.getBoundingClientRect()));
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  // Drag the window by its title bar.
+  const startDrag = (event) => {
+    if (event.button !== 0 || event.target.closest('button')) return;
+    const rect = box.current.getBoundingClientRect();
+    drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, width: rect.width };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+  const moveDrag = (event) => {
+    if (!drag.current) return;
+    const next = { x: event.clientX - drag.current.dx, y: event.clientY - drag.current.dy, width: drag.current.width };
+    setPosition({ ...clamp(next, box.current.getBoundingClientRect()), width: next.width });
+  };
+  const endDrag = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    setPosition((current) => {
+      savePosition(current);
+      return current;
+    });
+  };
+  // Arrow keys move it too (Shift = bigger steps); Home puts it back.
+  const onKey = (event) => {
+    const step = event.shiftKey ? 80 : 20;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (event.key === 'Home') {
+      setPosition(null);
+      savePosition(null);
+      event.preventDefault();
+      return;
+    }
+    if (!moves[event.key]) return;
+    const rect = box.current.getBoundingClientRect();
+    const next = clamp({ x: rect.left + moves[event.key][0], y: rect.top + moves[event.key][1] }, rect);
+    const moved = { ...next, width: rect.width };
+    setPosition(moved);
+    savePosition(moved);
+    event.preventDefault();
+  };
+  const placed = position
+    ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto', width: position.width ?? undefined }
+    : undefined;
 
   // Create the player once; afterwards just switch videos.
   useEffect(() => {
@@ -66,11 +147,28 @@ export default function YouTubeWindow() {
 
   return (
     <section
+      ref={box}
+      style={placed}
       aria-label={`YouTube video: ${current?.title ?? ''}`}
       // Phones: under the header. Wider screens: bottom left, clear of the queue (bottom right).
       className="window fixed inset-x-2 top-[4.75rem] z-40 sm:inset-x-auto sm:left-6 sm:top-auto sm:bottom-[7.5rem] sm:w-[22.5rem]"
     >
-      <div className="window-bar">
+      <div
+        className="window-bar cursor-move touch-none select-none"
+        role="toolbar"
+        tabIndex={0}
+        title="Drag to move · double-click to put it back"
+        aria-label="YouTube window: drag, or use the arrow keys, to move it; Home puts it back"
+        onPointerDown={startDrag}
+        onPointerMove={moveDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onKeyDown={onKey}
+        onDoubleClick={() => {
+          setPosition(null);
+          savePosition(null);
+        }}
+      >
         <span className="pixel-label truncate">full song · youtube</span>
         <button type="button" className="pixel-label shrink-0 hover:text-frost" onClick={() => setFullSongs(false)}>
           use 30s previews
