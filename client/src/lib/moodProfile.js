@@ -10,7 +10,7 @@ import {
   ENERGY_WORDS,
   INTENSITY_WORDS,
 } from '../data/spectrum.js';
-import { LANGUAGES } from '../data/languages.js';
+import { LANGUAGES, currentLanguageIds } from '../data/languages.js';
 
 const MOOD_IDS = MOODS.map((mood) => mood.id);
 const EFFECT_IDS = DESIRED_EFFECTS.map((effect) => effect.id);
@@ -75,7 +75,7 @@ export function buildProfile(draft) {
     genres: GENRE_IDS.filter((id) => draft.genres.includes(id)),
     desired_effect: draft.desiredEffect,
     tempo: draft.tempo,
-    languages: LANGUAGE_IDS.filter((id) => (draft.languages ?? []).includes(id)),
+    languages: LANGUAGE_IDS.filter((id) => currentLanguageIds(draft.languages).includes(id)),
   };
 }
 
@@ -93,7 +93,7 @@ export function sanitizeProfile(input) {
     genres: Array.isArray(input.genres) ? GENRE_IDS.filter((id) => input.genres.includes(id)) : [],
     desired_effect: input.desired_effect,
     tempo: TEMPO_IDS.includes(input.tempo) ? input.tempo : 'any',
-    languages: Array.isArray(input.languages) ? LANGUAGE_IDS.filter((id) => input.languages.includes(id)) : [],
+    languages: Array.isArray(input.languages) ? LANGUAGE_IDS.filter((id) => currentLanguageIds(input.languages).includes(id)) : [],
   };
 }
 

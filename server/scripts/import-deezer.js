@@ -37,7 +37,7 @@ const { songs, failures, changes } = await importDeezerCatalog({
   onProgress: ({ language, mood, found, error, tried = [] }) => {
     if (current !== language) {
       current = language;
-      console.log(`\n${LANGUAGES[language]}`);
+      console.log(`\n${LANGUAGES[language] ?? 'Cantonese playlists (labelled Chinese)'}`);
     }
     console.log(error ? `  ✗ ${mood}: ${error}` : `  ${found > 0 ? '✓' : '·'} ${mood}: ${found} songs`);
     // Explain empty results: which searches were tried and what they found.

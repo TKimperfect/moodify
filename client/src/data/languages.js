@@ -2,12 +2,15 @@
 export const LANGUAGES = [
   { id: 'ms', label: 'Malay', native: 'Bahasa Melayu' },
   { id: 'id', label: 'Indonesian', native: 'Bahasa Indonesia' },
-  { id: 'zh', label: 'Mandarin', native: '华语' },
-  { id: 'yue', label: 'Cantonese', native: '粵語' },
+  { id: 'zh', label: 'Chinese', native: '华语' }, // Mandarin and Cantonese
   { id: 'ko', label: 'Korean', native: '한국어' },
   { id: 'ja', label: 'Japanese', native: '日本語' },
   { id: 'en', label: 'English', native: 'English' },
 ];
+
+// Saved choices of languages MOODIFY no longer offers separately.
+const RETIRED = { yue: 'zh', nan: null };
+export const currentLanguageIds = (ids) => [...new Set((ids ?? []).map((id) => (id in RETIRED ? RETIRED[id] : id)).filter(Boolean))];
 
 export const languageLabel = (id) => {
   if (id === 'instrumental') return 'Instrumental';

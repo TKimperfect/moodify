@@ -1,10 +1,15 @@
 // Language labels for all imported songs together, so what one import knows
 // about an artist (e.g. their Korean titles or Malaysian label) helps the others.
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { labelLanguages, artistKey } from '../src/services/music/language.js';
 import { fetchIsrcs } from '../src/services/music/isrc.js';
+
+// Languages heard in the 30-second previews of songs whose title, artist and
+// ISRC say nothing (checked with a speech recogniser, then by hand).
+const HEARD = new Map(Object.entries(JSON.parse(readFileSync(fileURLToPath(new URL('../src/data/heard-languages.json', import.meta.url)), 'utf8')).songs));
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataFile = (name) => path.join(here, '..', 'data', name);
@@ -66,7 +71,7 @@ export async function updateIsrcs(catalogs, { shouldStop, log = console.log } = 
 // deezer: songs from language playlists (language = playlist language when
 // "found_in" is missing, as in files from before version 1.2.12).
 // muse: songs from the MuSe dataset.
-export function relabel({ deezer = [], muse = [], isrcs = new Map() }) {
+export function relabel({ deezer = [], muse = [], isrcs = new Map(), heard = HEARD }) {
   const museIds = new Set(muse.map((song) => song.id));
   const foundIn = (song) => song.found_in ?? (song.language ? [song.language] : []);
   // Songs found only in Taiwanese Hokkien playlists (no longer offered, and
@@ -80,7 +85,7 @@ export function relabel({ deezer = [], muse = [], isrcs = new Map() }) {
     // MuSe songs that were also in a language playlist get that as a hint.
     ...muse.map((song) => ({ ...song, found_in: song.found_in ?? playlistsById.get(song.id) ?? [] })),
   ];
-  const { songs, changes } = labelLanguages(input, { isrcs, museIds });
+  const { songs, changes } = labelLanguages(input, { isrcs, museIds, heard });
   return {
     deezer: songs.filter((song) => !museIds.has(song.id)),
     muse: songs.filter((song) => museIds.has(song.id)),

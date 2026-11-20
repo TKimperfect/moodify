@@ -32,7 +32,7 @@ if (stopRequested) {
 
 const result = relabel({ deezer, muse, isrcs });
 if (result.dropped.length) console.log(`\n${result.dropped.length} songs found only in Taiwanese Hokkien playlists leave the catalogue (Hokkien is no longer offered).`);
-const lines = describeChanges(result.changes, NAMES);
+const lines = describeChanges(result.changes, { ...NAMES, yue: 'Cantonese (old label)', nan: 'Taiwanese Hokkien (old label)' });
 console.log(result.changes.length ? `\n${result.changes.length} songs get a different language:` : '\nAll languages were already right.');
 for (const line of lines.slice(0, 20)) console.log(`  ${line}`);
 if (lines.length > 20) console.log(`  …and ${lines.length - 20} smaller groups`);

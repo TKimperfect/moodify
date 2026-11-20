@@ -1,4 +1,6 @@
-// Works out which language each song is sung in. Playlists mix languages
+// Works out which language each song is sung in. (Cantonese is told apart
+// from Mandarin internally, from Hong Kong labels and playlists, but both are
+// labelled "zh", Chinese.) Playlists mix languages
 // (a "Chinese" playlist can hold French rap, a "Korean" one Japanese metal),
 // so a playlist alone does not decide. What does, in this order:
 //   1. instrumental music (karaoke, piano covers, spa music, lo-fi beats)
@@ -116,9 +118,11 @@ const MALAYSIAN_ONLY = setOf(`
   awak hendak kerana kerna mahu nak sahaja
 `);
 const JAPANESE_WORDS = setOf(`
-  ai aki ame arigatou asa boku da dake de desu e egao fuyu ga hana haru hoshi ka kara kaze kimi kimochi koi
-  kokoro made mirai mo nai namida natsu ne ni no ore sakura sayonara sekai shite sora to tsuki umi wa watashi wo
-  yo yoru yume
+  ai akai aki akuma ame anata aoi arigatou asa boku da daisuki dake de densha desu e egao fuyu ga hana hanabi
+  haru hikari hito hoshi inochi ka kage kaimono kami kanashii kara kawaii kaze kibou kimi kimochi kioku kirei
+  kiseki kitsune koe koi kokoro kuroi kyoku machi made matsuri mirai mo mura nai naki namida natsu ne ni no
+  omoide oni ore sabishii sakura sayonara sekai sekaiichi shiawase shinjitsu shiroi shite sora suki tenshi to
+  tomodachi tsuki umi unmei ureshii uta wa watashi wo yasashii yo yoru yuki yume zetsubou
 `);
 
 // ---- instrumental music ----
@@ -174,6 +178,12 @@ const CHECKED_ARTISTS = {
   bellyjay: 'other',
   // Checked: sung in Japanese or Korean, though nothing in the song data says so
   garnidelia: 'ja',
+  'release hallucination': 'ja', // melodies written for Japanese lyrics
+  chthonic: 'other', // Taiwanese band singing in Taiwanese Hokkien
+  snapline: 'en', // Beijing post-punk, English lyrics
+  'blood stain child': 'en',
+  'significant point': 'en', // Japanese heavy metal, lyrics in English
+  nemophila: 'ja', // also on its U.S. releases
   necronomidol: 'ja',
   'scarlet valse': 'ja', // visual kei band
   'mai yajima': 'ja',
@@ -277,12 +287,16 @@ function checkedLanguage(song) {
 const versionMark = (title) => VERSION_MARKS.find(([pattern]) => pattern.test(String(title ?? '')))?.[1] ?? null;
 
 // Japanese written in Latin letters ("Sonohiwa Kanarazu Kuru").
-const ROMAJI_WORD = /^(?:(?:[kgsztdnhbpmrwfjv]|ky|gy|sh|ch|ts|ny|hy|by|py|my|ry|j)?[aiueo]|n|[kstpgdbmc](?=[kstpgdbmc]))+$/;
+// Syllables (ka, shi, tsu, nyo...), "n", and doubled consonants as Japanese
+// spells them (kk, tt, pp, tch, mb/mp): "Redemption" or "Shotgun" do not match.
+const ROMAJI_WORD = /^(?:(?:[kgsztdnhbpmrwfjv]|ky|gy|sh|ch|ts|ny|hy|by|py|my|ry|j)?[aiueo]|n|([kstpgdbs])(?=\1)|t(?=ch)|m(?=[bp]))+$/;
 // strict: several words, one of them a common Japanese word ("Ai no Uta"), so
 // that English words shaped like Japanese ("Attitude", "Baddie") do not count.
 function isRomaji(title, { strict = false } = {}) {
   const list = words(mainTitle(title)).filter((word) => word.length > 1 || word === 'e');
-  if (strict && (list.length < 2 || !list.some((word) => JAPANESE_WORDS.has(word)))) return false;
+  // (a single long word like "katachinonaihana" counts too)
+  if (strict && list.length === 1) return list[0].length >= 10 && ROMAJI_WORD.test(list[0]);
+  if (strict && !list.some((word) => JAPANESE_WORDS.has(word))) return false;
   if (list.length < 2) return list.length === 1 && list[0].length >= 6 && ROMAJI_WORD.test(list[0]) && !ENGLISH_WORDS.has(list[0]);
   const romaji = list.filter((word) => ROMAJI_WORD.test(word));
   return (
@@ -376,7 +390,7 @@ function artistProfiles(songs, signals) {
   const profiles = new Map();
   for (const song of songs) {
     const key = artistKey(song.artist);
-    const profile = profiles.get(key) ?? { songs: 0, votes: {}, playlists: {}, countries: {}, other: 0, english: 0, albumInstrumental: 0, hongKong: { yue: 0, zh: 0 }, sure: 0, chinese: 0, singapore: 0, malay: 0, englishLabel: 0 };
+    const profile = profiles.get(key) ?? { songs: 0, votes: {}, playlists: {}, countries: {}, other: 0, english: 0, albumInstrumental: 0, hongKong: { yue: 0, zh: 0 }, sure: 0, chinese: 0, singapore: 0, malay: 0, englishLabel: 0, museEnglishLabel: 0 };
     profiles.set(key, profile);
     profile.songs += 1;
     const { foundIn } = song;
@@ -397,6 +411,7 @@ function artistProfiles(songs, signals) {
     if (signal.kind === 'english') {
       add(profile.votes, 'en', 1);
       profile.englishLabel += 1;
+      if (foundIn.includes('muse')) profile.museEnglishLabel += 1;
     }
     if (signal.kind === 'western') add(profile.votes, 'west', 1);
     if (signal.kind === 'other-asia') add(profile.votes, 'other', 1);
@@ -518,6 +533,11 @@ function decide(song, profile, signal) {
   if (kind === 'lofi' && onlyIn(foundIn, ['ja', 'en'])) return ['instrumental', 'lofi-label'];
   // A Western artist's song released by an Asian label (e.g. a live album recorded there).
   if (kind === 'asia' && onlyIn(foundIn, ['en', 'muse']) && ['en', 'west', 'other'].includes(home)) kind = null;
+  // A MuSe song (Western listeners) by an artist whose MuSe songs come from an
+  // English-speaking label, while an Asian artist has the same name (Eve).
+  if (!kind && foundIn.includes('muse') && profile.museEnglishLabel && [...CHINESE, 'ko', 'ja', 'ms', 'id'].includes(home) && !scriptOf(title)) {
+    return [(other || accents) && !english ? 'other' : 'en', 'isrc'];
+  }
   // A Korean or Japanese artist's song released by a Hong Kong, Taiwan or China label.
   if (kind === 'asia' && CHINESE.includes(country) && ['ko', 'ja', 'ms', 'id'].includes(home) && !foundIn.some((language) => CHINESE.includes(language))) kind = null;
   if (kind === 'asia') {
@@ -536,7 +556,7 @@ function decide(song, profile, signal) {
   // (Gala, LISA / LiSA), or an Asian act's English release found in English playlists.
   const asianName = HANGUL.test(song.artist) || KANA.test(song.artist) || HAN.test(song.artist);
   const homePlaylist = CHINESE.includes(home) ? foundIn.some((language) => CHINESE.includes(language)) : foundIn.includes(home);
-  if ((kind === 'english' || kind === 'western') && [...CHINESE, 'ko', 'ja'].includes(home) && !homePlaylist && !isPinyin(title) && !isRomaji(title) && !asianName) {
+  if ((kind === 'english' || kind === 'western') && [...CHINESE, 'ko', 'ja'].includes(home) && !homePlaylist && !isPinyin(title) && !isRomaji(title, { strict: true }) && !asianName) {
     return [(other || accents) && !english ? 'other' : 'en', 'isrc'];
   }
   if (home === 'ko' || home === 'ja') {
@@ -552,7 +572,7 @@ function decide(song, profile, signal) {
   if (home === 'other' && !english) return ['other', 'artist'];
   if (other && !english) return ['other', 'words'];
   if (accents && !english && !malay) return ['other', 'words'];
-  if (isRomaji(title) && foundIn.includes('ja')) return ['ja', 'romaji'];
+  if (isRomaji(title, { strict: true }) && foundIn.includes('ja')) return ['ja', 'romaji'];
   // English: the artist is known from English playlists, MuSe (Western
   // listeners) or an English-speaking label. Otherwise nothing tells.
   if (profile.playlists.en || profile.playlists.muse || profile.englishLabel) return ['en', 'default'];
@@ -573,7 +593,10 @@ export function detectLanguage(song) {
 //   isrcs: Map of song id -> ISRC (songs may also carry .isrc)
 //   museIds: ids of songs from the MuSe research dataset (Western listeners)
 //   extraWesternArtists: artists known from MuSe (counted like a MuSe song)
-export function labelLanguages(songs, { isrcs = new Map(), museIds = new Set(), extraWesternArtists = [] } = {}) {
+//   heard: Map of song id -> language heard in the song's audio preview
+//     (src/data/heard-languages.json). Used only for songs the rules above
+//     leave as "unknown".
+export function labelLanguages(songs, { isrcs = new Map(), museIds = new Set(), extraWesternArtists = [], heard = new Map() } = {}) {
   const prepared = songs.map((song) => {
     const playlists = (song.foundIn ?? song.found_in ?? []).filter((language) => !RETIRED.includes(language));
     const isrc = song.isrc ?? isrcs.get(song.id) ?? null;
@@ -589,7 +612,10 @@ export function labelLanguages(songs, { isrcs = new Map(), museIds = new Set(), 
   const reasons = {};
   const reasonById = new Map();
   const labelled = prepared.map(({ foundIn, isrc: _isrc, ...song }) => {
-    const [language, reason] = decide({ ...song, foundIn }, profiles.get(artistKey(song.artist)), signals.get(song.id));
+    let [decided, reason] = decide({ ...song, foundIn }, profiles.get(artistKey(song.artist)), signals.get(song.id));
+    if (decided === 'unknown' && heard.has(song.id)) [decided, reason] = [heard.get(song.id), 'heard in the audio preview'];
+    // Cantonese and Mandarin share one label, "Chinese" (zh), since 1.2.22.
+    const language = decided === 'yue' ? 'zh' : decided;
     reasons[reason] = (reasons[reason] ?? 0) + 1;
     reasonById.set(song.id, reason);
     if (song.language && song.language !== language) changes.push({ id: song.id, from: song.language, to: language, example: `${song.artist} – ${song.title}` });

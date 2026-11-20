@@ -42,9 +42,9 @@ test('builds the structured profile from the spec example', () => {
 
 test('languages are kept in a fixed order and unknown ones are dropped', () => {
   const profile = buildProfile({ ...DEFAULT_DRAFT, moods: ['sad'], desiredEffect: 'comfort', languages: ['ko', 'yue', 'xx'] });
-  assert.deepEqual(profile.languages, ['yue', 'ko']);
+  assert.deepEqual(profile.languages, ['zh', 'ko']); // a saved Cantonese choice is Chinese now
   assert.deepEqual(sanitizeProfile({ ...profile, languages: ['ms', 'nope'] }).languages, ['ms']);
-  assert.match(summarizeProfile({ ...profile, languages: ['yue', 'ko'] }), /sung in Cantonese and Korean\.$/);
+  assert.match(summarizeProfile({ ...profile, languages: ['zh', 'ko'] }), /sung in Chinese and Korean\.$/);
 });
 
 test('the same mood can carry different desired effects', () => {

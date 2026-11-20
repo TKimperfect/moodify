@@ -149,21 +149,26 @@ export const LANGUAGES = {
   en: 'English',
   ms: 'Malay',
   id: 'Indonesian',
-  zh: 'Mandarin',
-  yue: 'Cantonese',
+  zh: 'Chinese', // Mandarin and Cantonese (one label since 1.2.22)
   ko: 'Korean',
   ja: 'Japanese',
 };
 export const LANGUAGE_IDS = Object.keys(LANGUAGES);
 // "unknown": nothing in the song data or a web search tells the language.
 export const SONG_LANGUAGE_IDS = [...LANGUAGE_IDS, 'instrumental', 'other', 'unknown'];
-// Languages MOODIFY offered before (Taiwanese Hokkien until 1.2.13): still
-// accepted in saved preferences, and quietly left out.
-export const RETIRED_LANGUAGE_IDS = ['nan'];
+// Languages MOODIFY offered before: still accepted in saved preferences.
+// Cantonese (until 1.2.21) became part of Chinese; Taiwanese Hokkien (until
+// 1.2.13) is left out.
+const RETIRED_LANGUAGES = { yue: 'zh', nan: null };
+export const RETIRED_LANGUAGE_IDS = Object.keys(RETIRED_LANGUAGES);
 // A song still labelled with a retired language (kept because someone saved or
 // played it) is shown as "Other languages".
-export const currentLanguage = (language) => (RETIRED_LANGUAGE_IDS.includes(language) ? 'other' : language);
-export const withoutRetired = (languages) => (Array.isArray(languages) ? languages.filter((language) => !RETIRED_LANGUAGE_IDS.includes(language)) : languages);
+export const currentLanguage = (language) => (RETIRED_LANGUAGE_IDS.includes(language) ? RETIRED_LANGUAGES[language] ?? 'other' : language);
+export const withoutRetired = (languages) => {
+  if (!Array.isArray(languages) || !languages.some((language) => RETIRED_LANGUAGE_IDS.includes(language))) return languages;
+  // ["yue", "zh"] becomes ["zh"], not ["zh", "zh"]
+  return [...new Set(languages.map((language) => (RETIRED_LANGUAGE_IDS.includes(language) ? RETIRED_LANGUAGES[language] : language)).filter(Boolean))];
+};
 
 // Shared rules for songs whose moods are known but whose energy, effects and
 // tempo must be estimated (imported songs).

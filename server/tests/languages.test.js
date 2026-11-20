@@ -108,12 +108,12 @@ test('each song gets the language it is sung in, not its playlist\'s', async () 
   // An English title found only in a Malay playlist, nothing else Malay about it.
   assert.equal(detectLanguage({ title: 'Dead Man Walking', artist: 'Against The Current', foundIn: ['ms'], isrc: 'QM24S2602482' }), 'en');
   assert.equal(detectLanguage({ title: 'Mandarin Beach', artist: 'Ilkae', foundIn: ['en'] }), 'en'); // not a version mark
-  assert.equal(detectLanguage({ title: 'Wu Jian Dao (Yue)', artist: 'Andy Lau', foundIn: ['zh'] }), 'yue');
+  assert.equal(detectLanguage({ title: 'Wu Jian Dao (Yue)', artist: 'Andy Lau', foundIn: ['zh'] }), 'zh'); // Cantonese is part of Chinese
   assert.equal(detectLanguage({ title: 'Je te laisserai des mots', artist: 'Patrick Watson', foundIn: ['ja'] }), 'other');
   // Nothing but a Korean playlist: the language is unknown (with HYBE's label code it is Korean).
   assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'] }), 'unknown');
   assert.equal(detectLanguage({ title: 'Hype Boy', artist: 'NewJeans', foundIn: ['ko'], isrc: 'USA2P2230222' }), 'ko');
-  assert.equal(detectLanguage({ title: 'Dystopia', artist: 'Release Hallucination', foundIn: ['ja'], isrc: 'QZDY41666857' }), 'unknown'); // distributor code
+  assert.equal(detectLanguage({ title: "Beer's Shuffle", artist: 'Unsolude', foundIn: ['ja'], isrc: 'QZDY41666857' }), 'unknown'); // distributor code
   assert.equal(detectLanguage({ title: 'Hey Jude', artist: 'The Beatles', foundIn: ['muse'] }), 'en'); // known from MuSe
   assert.equal(detectLanguage({ title: 'Spa Relaxation', artist: 'Asian Zen Spa Music Meditation', foundIn: ['zh'] }), 'instrumental');
   assert.equal(detectLanguage({ title: 'Rooftop (Japanese ver.)', artist: 'N.Flying', foundIn: ['ko'] }), 'ja');
@@ -152,7 +152,7 @@ test('the ISRC (country of the label) tells the language', async () => {
   ]);
   const language = Object.fromEntries(songs.map((item) => [item.id, item.language]));
   assert.deepEqual(language, {
-    a1: 'ko', a2: 'ja', a3: 'ja', a4: 'yue', a5: 'yue', a6: 'yue', a7: 'id', a8: 'ms',
+    a1: 'ko', a2: 'ja', a3: 'ja', a4: 'zh', a5: 'zh', a6: 'zh', a7: 'id', a8: 'ms',
     a9: 'en', a10: 'other', a11: 'instrumental', a12: 'other', a13: 'id', a14: 'other', a15: 'zh', a16: 'en', a17: 'zh', a18: 'other', a19: 'unknown', a20: 'en', a21: 'ja', a22: 'ja', a23: 'ko', a24: 'ko',
   });
   assert.equal(isrcSignal('TCJPP2161270').language, 'ja'); // TuneCore Japan
@@ -199,7 +199,7 @@ test('the Deezer import builds language-tagged songs per mood', async () => {
   assert.equal(songs.find((item) => item.id === 'deezer-102').language, 'ko');
   assert.equal(songs.find((item) => item.id === 'deezer-202').language, 'ja');
   const eason = songs.find((item) => item.id === 'deezer-101');
-  assert.equal(eason.language, 'yue');
+  assert.equal(eason.language, 'zh'); // Cantonese songs are labelled Chinese
   assert.deepEqual(eason.moods, ['sad']);
   assert.equal(eason.title, '富士山下');
   assert.equal(eason.preview_url, null); // fetched fresh when played
@@ -211,19 +211,19 @@ test('the Deezer import builds language-tagged songs per mood', async () => {
 
 test('choosing languages filters recommendations and explains it', () => {
   const songs = [
-    ...Array.from({ length: 25 }, (_, i) => song(`yue-${i}`, 'yue')),
+    ...Array.from({ length: 25 }, (_, i) => song(`zh-${i}`, 'zh')),
     ...Array.from({ length: 25 }, (_, i) => song(`ko-${i}`, 'ko')),
     ...SONGS,
   ];
-  const result = recommend({ profile: { ...profile, languages: ['yue'] }, songs });
+  const result = recommend({ profile: { ...profile, languages: ['zh'] }, songs });
   assert.equal(result.recommendations.length, 10);
-  assert.ok(result.recommendations.every((item) => item.song.language === 'yue'));
-  assert.ok(result.recommendations[0].reasons.includes('Sung in Cantonese, as you asked.'));
+  assert.ok(result.recommendations.every((item) => item.song.language === 'zh'));
+  assert.ok(result.recommendations[0].reasons.includes('Sung in Chinese, as you asked.'));
   assert.equal(result.meta.instrumental_fill, false);
-  assert.ok(result.alternative.recommendations.every((item) => item.song.language === 'yue'));
+  assert.ok(result.alternative.recommendations.every((item) => item.song.language === 'zh'));
 
-  const both = recommend({ profile: { ...profile, languages: ['yue', 'ko'] }, songs, limit: 20 });
-  assert.ok(both.recommendations.every((item) => ['yue', 'ko'].includes(item.song.language)));
+  const both = recommend({ profile: { ...profile, languages: ['zh', 'ko'] }, songs, limit: 20 });
+  assert.ok(both.recommendations.every((item) => ['zh', 'ko'].includes(item.song.language)));
 });
 
 test('too few songs in a language: instrumental music fills the gap, ranked after', () => {
@@ -305,7 +305,7 @@ test('Deezer audio for catalogue songs redirects to a fresh preview', async () =
 test('profiles and sessions accept only known languages', async () => {
   const post = (body) => fetch(`${baseUrl}/api/recommendations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal((await post({ profile: { ...profile, languages: ['klingon'] } })).status, 400);
-  assert.equal((await post({ profile: { ...profile, languages: ['yue', 'yue'] } })).status, 400);
+  assert.equal((await post({ profile: { ...profile, languages: ['zh', 'zh'] } })).status, 400);
   const ok = await (await post({ profile: { ...profile, languages: ['ms'] } })).json();
   assert.deepEqual(ok.meta.languages, ['ms']);
   assert.equal(ok.meta.instrumental_fill, true); // the built-in catalogue has no Malay songs
@@ -313,7 +313,7 @@ test('profiles and sessions accept only known languages', async () => {
 
 test('Discover lists languages and search filters by language', async () => {
   const discover = await (await fetch(`${baseUrl}/api/songs/discover`)).json();
-  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'yue', 'ko', 'ja', 'instrumental', 'other', 'unknown']);
+  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'ko', 'ja', 'instrumental', 'other', 'unknown']);
   assert.equal(discover.languages.find((item) => item.id === 'instrumental').count, 70);
   const malay = await (await fetch(`${baseUrl}/api/songs?language=ms`)).json();
   assert.equal(malay.count, 0);
@@ -347,7 +347,7 @@ test('Taiwanese Hokkien is no longer offered: saved choices are ignored, its son
   const { profileUpdateSchema, moodProfileSchema } = await import('../src/validation/schemas.js');
   const { LANGUAGE_IDS } = await import('../src/data/taxonomy.js');
   assert.ok(!LANGUAGE_IDS.includes('nan'));
-  assert.deepEqual(profileUpdateSchema.parse({ favorite_languages: ['nan', 'yue'] }).favorite_languages, ['yue']);
+  assert.deepEqual(profileUpdateSchema.parse({ favorite_languages: ['nan', 'yue', 'zh'] }).favorite_languages, ['zh']); // Cantonese is now Chinese
   assert.deepEqual(moodProfileSchema.parse({ ...profile, languages: ['nan'] }).languages, []);
   assert.throws(() => moodProfileSchema.parse({ ...profile, languages: ['xx'] }));
   const { relabel } = await import('../scripts/languageLabels.js');
@@ -374,6 +374,27 @@ test('artists checked by hand: their language wins, and a shared name only in it
   assert.deepEqual(songs.map((item) => item.language), ['other', 'other', 'ko', 'en', 'ms', 'ko']);
 });
 
+test('same-name artists and English words that look Japanese', async () => {
+  const { labelLanguages } = await import('../src/services/music/language.js');
+  const museIds = new Set(['m1', 'm2']);
+  const { songs } = labelLanguages(
+    [
+      { id: 'j1', title: 'Gurenge', artist: 'LiSA', found_in: ['ja'], isrc: 'JPU901900001' },
+      { id: 'j2', title: 'homura', artist: 'LiSA', found_in: ['ja'], isrc: 'JPU902000002' },
+      { id: 'k1', title: 'SaWaDiKa', artist: 'LISA', found_in: ['ko'], isrc: 'USRC12601645' }, // BLACKPINK's Lisa, mostly English
+      { id: 'e1', title: 'Kaikai Kitan', artist: 'Eve', found_in: ['ja'], isrc: 'JPTF02000001' },
+      { id: 'e2', title: 'Kokoroyohou', artist: 'Eve', found_in: ['ja'], isrc: 'JPTF02000002' },
+      { id: 'm1', title: "You Had Me, You Lost", artist: 'Eve', isrc: 'USIR10000001' }, // the American rapper (MuSe)
+      { id: 'm2', title: "Who's That Girl?", artist: 'Eve' },
+      { id: 'g1', title: 'Shotgun', artist: 'George Ezra', found_in: ['ja'], isrc: 'GBARL1800001' }, // not "sho-t-gun"
+      { id: 'b1', title: 'Naki Kyoku', artist: 'Boris', found_in: ['ja'], isrc: 'US3JJ0000001' },
+    ],
+    { museIds },
+  );
+  const language = Object.fromEntries(songs.map((item) => [item.id, item.language]));
+  assert.deepEqual(language, { j1: 'ja', j2: 'ja', k1: 'en', e1: 'ja', e2: 'ja', m1: 'en', m2: 'en', g1: 'en', b1: 'ja' });
+});
+
 test('the assistant tells Malay and Indonesian apart', async () => {
   const { LANGUAGE_PATTERNS } = await import('../src/services/assistant/lexicon.js');
   const match = (id, text) => new RegExp(LANGUAGE_PATTERNS[id].re.source).test(text);
@@ -382,4 +403,17 @@ test('the assistant tells Malay and Indonesian apart', async () => {
   assert.equal(match('ms', 'nak dengar lagu melayu'), true);
   assert.equal(match('ms', 'bahasa melayu please'), true);
   assert.equal(match('id', 'bahasa melayu please'), false);
+});
+
+test('a language heard in the audio is used only when the rules find nothing', async () => {
+  const { labelLanguages } = await import('../src/services/music/language.js');
+  const songs = [
+    { id: 'h1', title: 'Orbit', artist: 'Nobody Known', found_in: ['ja'] },
+    { id: 'h2', title: '夜に駆ける', artist: 'YOASOBI', found_in: ['ja'] },
+  ];
+  const heard = new Map([['h1', 'ko'], ['h2', 'en']]);
+  const { songs: labelled, reasonById } = labelLanguages(songs, { heard });
+  assert.equal(labelled[0].language, 'ko');
+  assert.equal(reasonById.get('h1'), 'heard in the audio preview');
+  assert.equal(labelled[1].language, 'ja'); // the title is Japanese: the rules win
 });

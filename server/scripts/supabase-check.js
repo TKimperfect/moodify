@@ -165,8 +165,8 @@ try {
   check('log out', (await call('POST', '/auth/logout', { token: a.token })).status === 204);
 
   console.log('\n9. Song languages');
-  const langSession = await call('POST', '/mood-sessions', { token: a.token, body: { profile: { ...profile, languages: ['yue', 'ms'] } } });
-  check('mood sessions keep their languages', langSession.json?.mood_session?.languages?.join() === 'yue,ms', langSession.error ?? 'Run supabase/migrations/003_languages_youtube.sql');
+  const langSession = await call('POST', '/mood-sessions', { token: a.token, body: { profile: { ...profile, languages: ['zh', 'ms'] } } });
+  check('mood sessions keep their languages', langSession.json?.mood_session?.languages?.join() === 'zh,ms', langSession.error ?? 'Run supabase/migrations/003_languages_youtube.sql');
   const langProfile = await call('PATCH', '/auth/me', { token: a.token, body: { favorite_languages: ['zh', 'ko'] } });
   check('favourite languages are saved', langProfile.json?.profile?.favorite_languages?.join() === 'zh,ko', langProfile.error ?? 'Run supabase/migrations/003_languages_youtube.sql');
   const langRecs = await call('POST', '/recommendations', { token: a.token, body: { profile: { ...profile, genres: [] } } });

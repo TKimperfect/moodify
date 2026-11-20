@@ -120,7 +120,7 @@ test('only valid ids from Claude are kept', async () => {
 });
 
 test('languages from Claude are kept and passed on', async () => {
-  nextAnswer = { text: turn({ moods: ['sad'], desired_effect: 'embrace', languages: ['yue'], ready: true }) };
+  nextAnswer = { text: turn({ moods: ['sad'], desired_effect: 'embrace', languages: ['zh'], ready: true }) };
   const result = await respond({ message: '想听粤语歌', choice: null, history: [], state: null });
-  assert.deepEqual(result.profile.languages, ['yue']);
+  assert.deepEqual(result.profile.languages, ['zh']);
 });
