@@ -18,6 +18,7 @@ let refuseBigBatches = false;
 let deezerDown = false;
 const deezerQueries = [];
 let songRows = [];
+let songsTimeoutOnce = false;
 const fake = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   const json = (status, body, headers = {}) => {
@@ -49,13 +50,21 @@ const fake = http.createServer((req, res) => {
     return json(200, { data: [] });
   }
   if (url.pathname === '/rest/v1/songs') {
-    // Supabase: honour offset/limit or a Range header, at most 1000 rows per reply.
+    // Supabase (PostgREST): id filters such as id=gt.x / id=gte.x / id=lt.y,
+    // order=id, offset/limit or a Range header; at most 1000 rows per reply.
+    if (songsTimeoutOnce) {
+      songsTimeoutOnce = false;
+      return json(500, { code: '57014', message: 'canceling statement due to statement timeout' });
+    }
+    const filters = url.searchParams.getAll('id').map((filter) => /^(gt|gte|lt)\.(.*)$/.exec(filter)).filter(Boolean);
+    const test = { gt: (id, value) => id > value, gte: (id, value) => id >= value, lt: (id, value) => id < value };
+    const rows = [...songRows].sort((x, y) => (x.id < y.id ? -1 : 1)).filter((row) => filters.every(([, op, value]) => test[op](row.id, value)));
     const range = /(\d+)-(\d+)/.exec(req.headers.range ?? '');
     const offset = Number(url.searchParams.get('offset') ?? range?.[1] ?? 0);
     const limit = Math.min(1000, Number(url.searchParams.get('limit') ?? (range ? Number(range[2]) - Number(range[1]) + 1 : 1000)));
     // "Prefer: count=exact" asks for the total, sent back in Content-Range.
-    if (/count=exact/.test(req.headers.prefer ?? '')) res.setHeader('Content-Range', `${offset}-${offset + limit - 1}/${songRows.length}`);
-    return json(200, songRows.slice(offset, offset + limit));
+    if (/count=exact/.test(req.headers.prefer ?? '')) res.setHeader('Content-Range', `${offset}-${offset + limit - 1}/${rows.length}`);
+    return json(200, rows.slice(offset, offset + limit));
   }
   json(404, {});
 });
@@ -170,15 +179,19 @@ test('recommendation reasons name the dataset behind the mood', () => {
   assert.ok(explain(profile, { ...song, mood_source: 'mtg-jamendo' }, parts).includes('Mood tagged by people in the MTG-Jamendo dataset.'));
 });
 
-test('more than 1000 songs in Supabase are all read (page by page)', async () => {
+test('more than 1000 songs in Supabase are all read (page by page, by id)', async () => {
   songRows = Array.from({ length: 2500 }, (_, i) => ({
-    id: `s-${String(i).padStart(5, '0')}`, title: `T${i}`, artist: `A${i}`, genres: ['pop'], moods: ['sad'], effects: ['comfort'],
+    // ids on both sides of the slice borders ("deezer-2", "deezer-4"…)
+    id: i % 2 ? `deezer-${(i * 7919) % 100000}` : `s-${String(i).padStart(5, '0')}`, title: `T${i}`, artist: `A${i}`, genres: ['pop'], moods: ['sad'], effects: ['comfort'],
     energy: 30, intensity: 50, bpm: 80, tempo: 'slow', popularity: 10, year: 2020, provider: 'sample',
   }));
+  songsTimeoutOnce = true; // a statement timeout is tried again
   const { songRepository } = await import('../src/repositories/song.repository.js');
   const status = await songRepository.status({ fresh: true });
   assert.equal(status.source, 'supabase');
   assert.equal(status.songs, 2500);
+  const ids = new Set((await songRepository.findAll()).map((song) => song.id));
+  assert.equal(ids.size, 2500); // each song once
 });
 
 test('if Jamendo refuses a batch, the import splits it and still finishes', async () => {

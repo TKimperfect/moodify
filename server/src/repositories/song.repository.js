@@ -113,32 +113,47 @@ export function toSong(row) {
 let LOCAL = localCatalogue();
 let cache = { songs: LOCAL, source: 'local', loadedAt: 0, problem: null, note: null };
 
-// Supabase returns at most 1000 rows per request, so read page by page,
-// a few pages at a time (100,000 songs = 100 pages).
+// Supabase returns at most 1000 rows per request, so read page by page.
+// Each page asks for "the next 1000 ids after the last one read" (keyset
+// paging): the database finds them straight from the id index, however far
+// into the table. Paging by row number ("skip 99,000 rows") and counting all
+// rows get slower the bigger the table is and hit Supabase's statement
+// timeout, especially right after many songs were rewritten.
+// The id range is split into slices read side by side (ids look like
+// "deezer-3135553"), so 100,000 songs take a few seconds, not a minute.
 const PAGE = 1000;
 const MAX_SONGS = 200_000;
-const PAGES_AT_ONCE = 4;
-async function selectSongs(columns) {
-  const page = (from, count) => {
-    const query = getPublicClient().from('songs').select(columns, count ? { count: 'exact' } : undefined);
-    return query.order('id').range(from, from + PAGE - 1);
-  };
-  const first = await page(0, true);
-  if (first.error) return { data: null, error: first.error };
-  const all = [...first.data];
-  const total = Math.min(MAX_SONGS, first.count ?? (first.data.length < PAGE ? first.data.length : MAX_SONGS));
-  let from = PAGE;
-  while (from < total) {
-    const starts = [];
-    for (let i = 0; i < PAGES_AT_ONCE && from < total; i += 1, from += PAGE) starts.push(from);
-    const results = await Promise.all(starts.map((start) => page(start)));
-    for (const result of results) {
-      if (result.error) return { data: null, error: result.error };
-      all.push(...result.data);
-    }
-    if (results.at(-1).data.length < PAGE) break; // fewer songs than counted
+const SLICES = [null, 'deezer-2', 'deezer-4', 'deezer-6', 'deezer-8', 'e'];
+const TIMEOUT = '57014'; // Postgres: statement timeout
+
+async function readSlice(columns, from, to) {
+  const rows = [];
+  let after = null;
+  for (;;) {
+    const next = () => {
+      let query = getPublicClient().from('songs').select(columns);
+      if (after !== null) query = query.gt('id', after);
+      else if (from !== null) query = query.gte('id', from);
+      if (to !== null) query = query.lt('id', to);
+      return query.order('id').limit(PAGE);
+    };
+    let result = await next();
+    // A busy database can time out now and then: try that page once more.
+    if (result.error?.code === TIMEOUT) result = await next();
+    if (result.error) return { data: null, error: result.error };
+    rows.push(...result.data);
+    if (result.data.length < PAGE || rows.length >= MAX_SONGS) return { data: rows, error: null };
+    after = result.data.at(-1).id;
   }
-  return { data: all, error: null };
+}
+
+async function selectSongs(columns) {
+  const results = await Promise.all(SLICES.map((from, index) => readSlice(columns, from, SLICES[index + 1] ?? null)));
+  const failed = results.find((result) => result.error);
+  if (failed) return { data: null, error: failed.error };
+  // Each song once, even if slices were to overlap.
+  const byId = new Map(results.flatMap((result) => result.data).map((row) => [row.id, row]));
+  return { data: [...byId.values()].slice(0, MAX_SONGS), error: null };
 }
 
 let loading = null;
