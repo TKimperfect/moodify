@@ -1,6 +1,6 @@
 {
   "name": "moodify",
-  "version": "1.2.22",
+  "version": "1.2.23",
   "private": true,
   "description": "MOODIFY - AI-powered emotional music discovery platform",
   "scripts": {

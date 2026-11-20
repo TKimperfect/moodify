@@ -260,6 +260,8 @@ test('Clean-up: only old Deezer playlist songs that nobody used are removed', as
     { id: 'jamendo-5', provider: 'jamendo', mood_source: null },
   ];
   assert.deepEqual(staleSongIds(rows, ['deezer-1'], ['deezer-3']), ['deezer-2']);
+  // With the MuSe file read, MuSe songs it no longer offers go too.
+  assert.deepEqual(staleSongIds(rows, ['deezer-1'], ['deezer-3'], { sources: ['playlist', 'muse'] }), ['deezer-2', 'deezer-4']);
 });
 
 test('MuSe without mood words (the real Zenodo file): the three scores give all ten moods', async () => {

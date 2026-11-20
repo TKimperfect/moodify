@@ -22,7 +22,9 @@ export async function saveCatalog(name, source, allSongs) {
   }
   const db = createAdminClient();
   // "found_in" (where a song was found) is kept in the local file only.
-  const rows = songs.map(({ found_in: _foundIn, ...song }) => song);
+  // Songs of unknown language stay in the local file (what they say about
+  // their artists still helps to label other songs) but are not offered.
+  const rows = songs.filter((song) => song.language !== 'unknown').map(({ found_in: _foundIn, ...song }) => song);
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await db.from('songs').upsert(rows.slice(i, i + 500), { onConflict: 'id' });
     if (error) {
@@ -31,7 +33,7 @@ export async function saveCatalog(name, source, allSongs) {
       process.exit(1);
     }
   }
-  console.log(`✓ ${songs.length} songs written to the Supabase songs table`);
+  console.log(`✓ ${rows.length} songs written to the Supabase songs table${rows.length < songs.length ? ` (${songs.length - rows.length} of unknown language left out)` : ''}`);
 }
 
 export function moodCounts(songs) {

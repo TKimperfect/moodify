@@ -313,7 +313,7 @@ test('profiles and sessions accept only known languages', async () => {
 
 test('Discover lists languages and search filters by language', async () => {
   const discover = await (await fetch(`${baseUrl}/api/songs/discover`)).json();
-  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'ko', 'ja', 'instrumental', 'other', 'unknown']);
+  assert.deepEqual(discover.languages.map((item) => item.id), ['en', 'ms', 'id', 'zh', 'ko', 'ja', 'instrumental', 'other']);
   assert.equal(discover.languages.find((item) => item.id === 'instrumental').count, 70);
   const malay = await (await fetch(`${baseUrl}/api/songs?language=ms`)).json();
   assert.equal(malay.count, 0);
@@ -416,4 +416,17 @@ test('a language heard in the audio is used only when the rules find nothing', a
   assert.equal(labelled[0].language, 'ko');
   assert.equal(reasonById.get('h1'), 'heard in the audio preview');
   assert.equal(labelled[1].language, 'ja'); // the title is Japanese: the rules win
+});
+
+test('songs of unknown language are not offered (they stay in the import file only)', async () => {
+  const { loadImportedSongs } = await import('../src/repositories/song.repository.js');
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'moodify-unknown-'));
+  const file = path.join(dir, 'deezer-catalog.json');
+  const base = { genres: ['pop'], moods: ['happy'], energy: 60, intensity: 50, effects: ['uplift'], bpm: 110, tempo: 'medium', popularity: 50, provider: 'deezer', preview_url: null };
+  writeFileSync(file, JSON.stringify({ songs: [
+    { ...base, id: 'deezer-1', title: 'Known', artist: 'A', language: 'en' },
+    { ...base, id: 'deezer-2', title: 'Unknown', artist: 'B', language: 'unknown' },
+    { ...base, id: 'deezer-3', title: 'Old Cantonese label', artist: 'C', language: 'yue' },
+  ] }));
+  assert.deepEqual(loadImportedSongs(file).map((item) => [item.id, item.language]), [['deezer-1', 'en'], ['deezer-3', 'zh']]);
 });

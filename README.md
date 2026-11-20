@@ -179,7 +179,7 @@ Playlists mix languages (a "Chinese" playlist can hold French rap, a "Korean" on
 6. **Words**: Malay and Indonesian words (also built from a root: "merindukanmu" = me + rindu + kan + mu), French / Spanish / German… words and accents ("Other languages"). Malay or Indonesian: the artist's labels (MY, SG or ID) decide; words used only in Malaysia ("mahu", "sahaja", "kerana") or only in Indonesia ("nggak", "banget", "karena") also tell; without either it is Indonesian, because Malaysian singers nearly always have Malaysian codes while many Indonesian singers release through international distributors.
 7. **English** when the artist is known from English playlists, MuSe or an English-speaking label, or has a European label and an English title.
 8. **Heard in the preview**: songs the rules above cannot place were checked by listening: the 30-second Deezer preview of each went through a speech recogniser (Whisper), and every result was checked by hand. The results are in `server/src/data/heard-languages.json` (song id → language) and are used only for songs the rules leave unknown.
-9. Otherwise **Unknown language**: nothing in the song data (nor a web search, nor the preview) tells. These songs are recommended when no language is chosen, never when one is, and Discover lists them under "Unknown".
+9. Otherwise **Unknown language**: nothing in the song data (nor a web search, nor the preview) tells. Since 1.2.22 these songs are not offered: they stay in the local import files (what they say about their artists still helps to label other songs) but are not written to Supabase, and `npm run music:prune-languages -- delete` removes them from it (songs anyone saved, rated or played are kept).
 
 Some artists cannot be placed by these rules (a Japanese band singing in English, an Italian band in a Japanese playlist, Malaysian singers without Malaysian codes...). Those with the most songs were checked by hand with a web search and are listed in `CHECKED_ARTISTS` in `language.js`; add an artist there to correct its language.
 
@@ -191,7 +191,7 @@ To fix the languages of songs that are already imported, without searching Deeze
 npm run music:relabel-languages
 ```
 
-After changing the language search words, songs from the old searches stay in Supabase. This shows how many there are; add `-- delete` to remove them. Songs anyone saved, rated or played are always kept.
+After changing the language search words, songs from the old searches stay in Supabase, and so do songs whose language turned out to be unknown. `npm run music:prune-languages` shows how many there are; add `-- delete` to remove them. Songs anyone saved, rated or played are always kept.
 
 ```bash
 npm run music:import-muse

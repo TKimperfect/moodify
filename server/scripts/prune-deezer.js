@@ -1,4 +1,5 @@
-// Removes songs left over from older Deezer playlist imports.
+// Removes songs left over from older Deezer playlist imports, and songs whose
+// language could not be found out ("unknown", not offered since 1.2.22).
 // Run from the "moodify" folder:
 //   npm run music:prune-languages            (only shows what would be removed)
 //   npm run music:prune-languages -- delete (really removes them)
@@ -18,9 +19,12 @@ if (!hasSecretKey) {
   console.error('✗ Supabase is not set up in server/.env, so there is nothing to clean.');
   process.exit(1);
 }
+// Songs MOODIFY offers: everything imported except songs of unknown language.
+const offered = (songs) => songs.filter((song) => song.language !== 'unknown').map((song) => song.id);
+const sources = ['playlist'];
 let current;
 try {
-  current = JSON.parse(await readFile(FILE, 'utf8')).songs.map((song) => song.id);
+  current = offered(JSON.parse(await readFile(FILE, 'utf8')).songs);
 } catch {
   console.error('✗ server/data/deezer-catalog.json is missing. Run "npm run music:import-languages" first.');
   process.exit(1);
@@ -29,9 +33,10 @@ try {
 // Songs that came from MuSe are kept too.
 try {
   const muse = JSON.parse(await readFile(path.join(here, '..', 'data', 'muse-catalog.json'), 'utf8')).songs;
-  current.push(...muse.map((song) => song.id));
+  current.push(...offered(muse));
+  sources.push('muse'); // only with the MuSe file: without it every MuSe song would look old
 } catch {
-  // no MuSe import
+  // no MuSe import: MuSe songs are left alone
 }
 
 const db = createAdminClient();
@@ -46,13 +51,13 @@ async function readAll(table, columns, filter = (query) => query) {
 }
 
 try {
-  const songs = await readAll('songs', 'id,provider,mood_source,language,moods', (query) => query.eq('provider', 'deezer').eq('mood_source', 'playlist'));
+  const songs = await readAll('songs', 'id,provider,mood_source,language,moods', (query) => query.eq('provider', 'deezer').in('mood_source', sources));
   const used = [
     ...(await readAll('favorites', 'song_id')),
     ...(await readAll('playlist_songs', 'song_id')),
     ...(await readAll('listening_history', 'song_id')),
   ].map((row) => row.song_id);
-  const stale = new Set(staleSongIds(songs, current, used));
+  const stale = new Set(staleSongIds(songs, current, used, { sources }));
 
   const counts = {};
   for (const song of songs) {
@@ -60,7 +65,8 @@ try {
     const key = `${song.language ?? '?'} ${song.moods?.[0] ?? '?'}`;
     counts[key] = (counts[key] ?? 0) + 1;
   }
-  console.log(`${stale.size} old Deezer songs are no longer in the latest import (songs people used are kept).`);
+  const unknown = songs.filter((song) => stale.has(song.id) && song.language === 'unknown').length;
+  console.log(`${stale.size} Deezer songs are no longer offered (songs people used are kept): ${unknown} of unknown language, ${stale.size - unknown} from older imports.`);
   for (const [key, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) console.log(`  ${key}: ${count}`);
 
   if (!really) {

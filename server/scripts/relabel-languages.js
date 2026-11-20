@@ -46,7 +46,8 @@ console.log(`\nNow: ${counts.map(([name, count]) => `${name} ${count}`).join(' Â
 if (result.changes.length || result.dropped.length) {
   if (result.deezer.length) await saveCatalog('deezer-catalog', 'deezer', result.deezer);
   if (result.muse.length) await saveCatalog('muse-catalog', 'muse', result.muse);
-  if (result.dropped.length) console.log('Then run "npm run music:prune-languages -- delete" to remove them from Supabase too (songs anyone saved or played are kept).');
+  const unknown = all.filter((song) => song.language === 'unknown').length;
+  if (result.dropped.length || unknown) console.log(`Then run "npm run music:prune-languages" to see what leaves Supabase${unknown ? ` (including ${unknown} songs of unknown language, which MOODIFY no longer offers)` : ''}, and add "-- delete" to remove them (songs anyone saved or played are kept).`);
   console.log('Restart the backend (Render: Manual Deploy â†’ Restart) to see the new labels on the website.');
 }
 process.exit(0);

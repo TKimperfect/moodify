@@ -66,7 +66,8 @@ export function loadImportedSongs(file) {
   if (Array.isArray(parsed?.songs) && songs.length < parsed.songs.length) {
     console.warn(`[songs] Ignored ${parsed.songs.length - songs.length} damaged entries in ${path.basename(file)}`);
   }
-  return songs;
+  // Songs whose language could not be found out are not offered (since 1.2.22).
+  return songs.filter((song) => song.language !== 'unknown');
 }
 
 // Joins song lists; when a song appears more than once, the later list wins.
