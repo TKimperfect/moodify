@@ -20,6 +20,24 @@ function savePosition(position) {
     // private window or storage blocked: the position is simply not remembered
   }
 }
+// Window sizes. YouTube requires the player to be at least 200x200 pixels,
+// so "small" is a 220px wide window whose video area stays 200px tall.
+const SIZES = {
+  small: { label: 's', name: 'small', width: '13.75rem' },
+  medium: { label: 'm', name: 'medium', width: 'min(22.5rem, calc(100vw - 1rem))' },
+  large: { label: 'l', name: 'large', width: 'min(32rem, calc(100vw - 1rem))' },
+};
+const SIZE_ORDER = ['small', 'medium', 'large'];
+const SIZE_KEY = 'moodify.youtubeWindowSize';
+function savedSize() {
+  try {
+    const value = localStorage.getItem(SIZE_KEY);
+    return SIZES[value] ? value : 'medium';
+  } catch {
+    return 'medium';
+  }
+}
+
 // Keeps the whole window on screen, below the site's header and above the
 // player bar, so its title bar can always be grabbed again.
 function clamp(position, box) {
@@ -59,14 +77,14 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
   const startDrag = (event) => {
     if (event.button !== 0 || event.target.closest('button')) return;
     const rect = box.current.getBoundingClientRect();
-    drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, width: rect.width };
+    drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
   };
   const moveDrag = (event) => {
     if (!drag.current) return;
-    const next = { x: event.clientX - drag.current.dx, y: event.clientY - drag.current.dy, width: drag.current.width };
-    setPosition({ ...clamp(next, box.current.getBoundingClientRect()), width: next.width });
+    const next = { x: event.clientX - drag.current.dx, y: event.clientY - drag.current.dy };
+    setPosition(clamp(next, box.current.getBoundingClientRect()));
   };
   const endDrag = () => {
     if (!drag.current) return;
@@ -89,14 +107,28 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
     if (!moves[event.key]) return;
     const rect = box.current.getBoundingClientRect();
     const next = clamp({ x: rect.left + moves[event.key][0], y: rect.top + moves[event.key][1] }, rect);
-    const moved = { ...next, width: rect.width };
-    setPosition(moved);
-    savePosition(moved);
+    setPosition(next);
+    savePosition(next);
     event.preventDefault();
   };
-  const placed = position
-    ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto', width: position.width ?? undefined }
-    : undefined;
+  // Small, medium or large (remembered in this browser).
+  const [size, setSize] = useState(savedSize);
+  const nextSize = SIZE_ORDER[(SIZE_ORDER.indexOf(size) + 1) % SIZE_ORDER.length];
+  const changeSize = () => {
+    setSize(nextSize);
+    try {
+      localStorage.setItem(SIZE_KEY, nextSize);
+    } catch {
+      // storage blocked: the size is simply not remembered
+    }
+  };
+  // A bigger window must still fit where it was moved to.
+  useEffect(() => {
+    setPosition((current) => clamp(current, box.current?.getBoundingClientRect()));
+  }, [size]);
+  const small = size === 'small';
+
+  const placed = { width: SIZES[size].width, ...(position ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' } : {}) };
 
   // Create the player once; afterwards just switch videos.
   useEffect(() => {
@@ -156,7 +188,7 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
       hidden={hidden}
       aria-label={`YouTube video: ${current?.title ?? ''}`}
       // Phones: under the header. Wider screens: bottom left, clear of the queue (bottom right).
-      className="window fixed inset-x-2 top-[4.75rem] z-40 sm:inset-x-auto sm:left-6 sm:top-auto sm:bottom-[7.5rem] sm:w-[22.5rem]"
+      className="window fixed left-2 top-[4.75rem] z-40 sm:left-6 sm:top-auto sm:bottom-[7.5rem]"
     >
       <div
         className="window-bar cursor-move touch-none select-none"
@@ -174,14 +206,33 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
           savePosition(null);
         }}
       >
-        <span className="pixel-label truncate">full song · youtube</span>
-        <span className="flex shrink-0 items-center gap-3">
-          <button type="button" className="pixel-label hover:text-frost" onClick={() => setFullSongs(false)}>
-            use 30s previews
+        <span className="pixel-label truncate">
+          {small ? '' : <span className="sm:hidden">youtube</span>}
+          {small ? '' : <span className="hidden sm:inline">full song · youtube</span>}
+        </span>
+        {/* Padding gives fingers a big enough target; the negative margin keeps the bar slim. */}
+        <span className="-my-2 flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            className="pixel-label rounded px-2 py-2.5 hover:text-frost"
+            onClick={changeSize}
+            aria-label={`Window size: ${SIZES[size].name}. Change to ${SIZES[nextSize].name}`}
+            title={`Size: ${SIZES[size].name} (click for ${SIZES[nextSize].name})`}
+          >
+            size {SIZES[size].label}
           </button>
           <button
             type="button"
-            className="pixel-label hover:text-frost"
+            className="pixel-label rounded px-2 py-2.5 hover:text-frost"
+            onClick={() => setFullSongs(false)}
+            aria-label="Use 30-second previews instead of whole songs"
+            title="Use 30-second previews instead of whole songs"
+          >
+            {small ? '30s' : <><span className="sm:hidden">30s previews</span><span className="hidden sm:inline">use 30s previews</span></>}
+          </button>
+          <button
+            type="button"
+            className="pixel-label rounded px-2 py-2.5 hover:text-frost"
             onClick={onHide}
             aria-label="Hide the video (pauses the song: YouTube songs only play while the video is visible). Show it again from the player bar."
             title="Hide the video (pauses the song). Show it again from the player bar."

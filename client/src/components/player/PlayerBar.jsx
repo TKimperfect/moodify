@@ -105,20 +105,6 @@ export default function PlayerBar() {
               <p className="truncate text-xs text-silver">{song?.artist}</p>
               <p className="pixel-label mt-0.5 truncate text-rose" aria-live="polite">
                 {statusText}
-                {onYouTube && (
-                  <>
-                    {' · '}
-                    <button
-                      type="button"
-                      className="pixel-label text-rose underline underline-offset-2 hover:text-frost"
-                      onClick={videoHidden ? showVideo : hideVideo}
-                      aria-pressed={!videoHidden}
-                      title={videoHidden ? 'Show the YouTube video and play on' : 'Hide the YouTube video (pauses the song)'}
-                    >
-                      {videoHidden ? 'show video' : 'hide video'}
-                    </button>
-                  </>
-                )}
                 {!onYouTube && song?.playback?.links?.[0] && (song.playback.source === 'jamendo' || !playable) && (
                   <>
                     {' · '}
@@ -134,13 +120,21 @@ export default function PlayerBar() {
           {/* Main controls */}
           <div className="flex items-center gap-1 sm:gap-1.5">
             <ControlButton icon="shuffle" label={player.shuffle ? 'Shuffle: on' : 'Shuffle: off'} active={player.shuffle} onClick={player.toggleShuffle} className="hidden sm:inline-flex" />
-            <ControlButton icon="previous" label="Previous" active={null} onClick={player.previous} className="hidden sm:inline-flex" />
+            <ControlButton icon="previous" label="Previous" active={null} onClick={player.previous} />
             <ControlButton icon={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} active={null} large onClick={player.togglePlay} disabled={!playable} />
             <ControlButton icon="next" label="Next" active={null} onClick={player.next} />
             <span className="relative hidden sm:inline-flex">
               <ControlButton icon="repeat" label={repeatLabel} active={player.repeat !== 'off'} onClick={player.cycleRepeat} />
               {player.repeat === 'one' && <span className="pointer-events-none absolute -right-0.5 -top-0.5 text-[0.6rem] font-bold text-orchid">1</span>}
             </span>
+            {onYouTube && (
+              <ControlButton
+                icon="video"
+                label={videoHidden ? 'Show the YouTube video (and play on)' : 'Hide the YouTube video (pauses the song)'}
+                active={!videoHidden}
+                onClick={videoHidden ? showVideo : hideVideo}
+              />
+            )}
             <ControlButton icon="queue" label={queueOpen ? 'Hide queue' : `Show queue (${player.queue.length})`} active={queueOpen} onClick={() => setQueueOpen((value) => !value)} className="md:hidden" />
           </div>
 
