@@ -13,9 +13,18 @@ const FEATURED_IDS = [
 
 const byPopularity = (a, b) => b.popularity - a.popularity;
 
+// A number from 0 to 2^32 for this song and seed (FNV-1a): the same seed
+// always gives the same order, another seed another one.
+function mixKey(id, seed) {
+  let hash = (2166136261 ^ seed) >>> 0;
+  for (let i = 0; i < id.length; i += 1) hash = Math.imul(hash ^ id.charCodeAt(i), 16777619) >>> 0;
+  hash ^= hash >>> 15;
+  return Math.imul(hash, 2246822507) >>> 0;
+}
+
 // Returns one page of the matching songs and how many match in total
 // (offset = how many were shown already, for "Show more").
-export async function searchSongs({ q, mood, genre, language, ids, limit, offset = 0 }) {
+export async function searchSongs({ q, mood, genre, language, ids, limit, offset = 0, sort = 'popular', seed = 0 }) {
   if (ids) {
     const songs = await songRepository.findByIds(ids);
     return { songs, total: songs.length };
@@ -26,8 +35,11 @@ export async function searchSongs({ q, mood, genre, language, ids, limit, offset
     .filter((song) => !mood || song.moods.includes(mood))
     .filter((song) => !genre || song.genres.includes(genre))
     .filter((song) => !language || song.language === language)
-    .filter((song) => !needle || `${song.title} ${song.artist}`.toLowerCase().includes(needle))
-    .sort(byPopularity);
+    .filter((song) => !needle || `${song.title} ${song.artist}`.toLowerCase().includes(needle));
+  if (sort === 'shuffle') {
+    const keys = new Map(matches.map((song) => [song.id, mixKey(song.id, seed)]));
+    matches.sort((a, b) => keys.get(a.id) - keys.get(b.id) || (a.id < b.id ? -1 : 1));
+  } else matches.sort(byPopularity);
   return { songs: matches.slice(offset, offset + limit), total: matches.length };
 }
 

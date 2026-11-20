@@ -18,7 +18,7 @@ let refuseBigBatches = false;
 let deezerDown = false;
 const deezerQueries = [];
 let songRows = [];
-let songsTimeoutOnce = false;
+let songsTimeouts = 0;
 const fake = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   const json = (status, body, headers = {}) => {
@@ -52,8 +52,8 @@ const fake = http.createServer((req, res) => {
   if (url.pathname === '/rest/v1/songs') {
     // Supabase (PostgREST): id filters such as id=gt.x / id=gte.x / id=lt.y,
     // order=id, offset/limit or a Range header; at most 1000 rows per reply.
-    if (songsTimeoutOnce) {
-      songsTimeoutOnce = false;
+    if (songsTimeouts > 0) {
+      songsTimeouts -= 1;
       return json(500, { code: '57014', message: 'canceling statement due to statement timeout' });
     }
     const filters = url.searchParams.getAll('id').map((filter) => /^(gt|gte|lt)\.(.*)$/.exec(filter)).filter(Boolean);
@@ -185,7 +185,7 @@ test('more than 1000 songs in Supabase are all read (page by page, by id)', asyn
     id: i % 2 ? `deezer-${(i * 7919) % 100000}` : `s-${String(i).padStart(5, '0')}`, title: `T${i}`, artist: `A${i}`, genres: ['pop'], moods: ['sad'], effects: ['comfort'],
     energy: 30, intensity: 50, bpm: 80, tempo: 'slow', popularity: 10, year: 2020, provider: 'sample',
   }));
-  songsTimeoutOnce = true; // a statement timeout is tried again
+  songsTimeouts = 2; // statement timeouts: the page is tried again (after a wait, with fewer rows)
   const { songRepository } = await import('../src/repositories/song.repository.js');
   const status = await songRepository.status({ fresh: true });
   assert.equal(status.source, 'supabase');

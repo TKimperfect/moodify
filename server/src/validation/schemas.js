@@ -41,6 +41,10 @@ export const songSearchSchema = z.strictObject({
     .optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  // "shuffle" mixes the matches in an order fixed by seed, so "Show more"
+  // continues the same order; "popular" puts the most played first.
+  sort: z.enum(['popular', 'shuffle']).default('popular'),
+  seed: z.coerce.number().int().min(0).max(2_147_483_647).default(0),
 });
 
 export const songParamsSchema = z.strictObject({ id: songId });

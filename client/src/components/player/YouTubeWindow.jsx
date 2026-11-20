@@ -20,19 +20,22 @@ function savePosition(position) {
     // private window or storage blocked: the position is simply not remembered
   }
 }
-// Keeps the whole window on screen.
+// Keeps the whole window on screen, below the site's header and above the
+// player bar, so its title bar can always be grabbed again.
 function clamp(position, box) {
   if (!position || !box) return position;
+  const top = document.querySelector('[data-site-header]')?.getBoundingClientRect().bottom ?? 0;
+  const bottom = document.querySelector('.player-bar')?.getBoundingClientRect().top ?? window.innerHeight;
   const maxX = Math.max(0, window.innerWidth - box.width);
-  const maxY = Math.max(0, window.innerHeight - box.height);
-  return { x: Math.min(Math.max(0, position.x), maxX), y: Math.min(Math.max(0, position.y), maxY) };
+  const maxY = Math.max(top, bottom - box.height);
+  return { ...position, x: Math.min(Math.max(0, position.x), maxX), y: Math.min(Math.max(top, position.y), maxY) };
 }
 
 // YouTube's own player, shown while a full song plays.
 // YouTube's rules: the player must stay visible (at least 200x200 pixels),
 // so it is a small window above the player bar rather than hidden.
 export default function YouTubeWindow() {
-  const { youtube, current, setFullSongs } = usePlayer();
+  const { youtube, current, setFullSongs, status, togglePlay } = usePlayer();
   const holder = useRef(null);
   const player = useRef(null);
   const loadedId = useRef(null);
@@ -90,6 +93,28 @@ export default function YouTubeWindow() {
     savePosition(moved);
     event.preventDefault();
   };
+  // Hiding the video. YouTube's rules do not allow a song to play while its
+  // player is hidden, so hiding pauses it, and playing shows the video again.
+  const [hidden, setHidden] = useState(false);
+  const resumeOnShow = useRef(false);
+  const previousStatus = useRef(status);
+  const playing = status === 'playing' || status === 'loading';
+  useEffect(() => {
+    const wasPlaying = previousStatus.current === 'playing' || previousStatus.current === 'loading';
+    previousStatus.current = status;
+    if (hidden && playing && !wasPlaying) setHidden(false); // play pressed in the player bar
+  }, [status, hidden, playing]);
+  const hide = () => {
+    resumeOnShow.current = playing;
+    if (playing) togglePlay();
+    setHidden(true);
+  };
+  const show = () => {
+    setHidden(false);
+    if (resumeOnShow.current && !playing) togglePlay();
+    resumeOnShow.current = false;
+  };
+
   const placed = position
     ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto', width: position.width ?? undefined }
     : undefined;
@@ -169,13 +194,26 @@ export default function YouTubeWindow() {
           savePosition(null);
         }}
       >
-        <span className="pixel-label truncate">full song · youtube</span>
-        <button type="button" className="pixel-label shrink-0 hover:text-frost" onClick={() => setFullSongs(false)}>
-          use 30s previews
-        </button>
+        <span className="pixel-label truncate">{hidden ? 'video hidden · paused' : 'full song · youtube'}</span>
+        <span className="flex shrink-0 items-center gap-3">
+          {!hidden && (
+            <button type="button" className="pixel-label hover:text-frost" onClick={() => setFullSongs(false)}>
+              use 30s previews
+            </button>
+          )}
+          <button
+            type="button"
+            className="pixel-label hover:text-frost"
+            onClick={hidden ? show : hide}
+            aria-label={hidden ? 'Show the video and play on' : 'Hide the video (pauses the song: YouTube songs only play while the video is visible)'}
+            title={hidden ? 'Show the video and play on' : 'Hide the video (pauses the song)'}
+          >
+            {hidden ? 'show ▢' : 'hide —'}
+          </button>
+        </span>
       </div>
-      {/* 16:9, never smaller than 200px tall (YouTube's minimum player size) */}
-      <div className="relative aspect-video min-h-[200px] w-full bg-ink" ref={holder}>
+      {/* 16:9, never smaller than 200px tall (YouTube's minimum player size). Hidden only while paused. */}
+      <div className={`relative aspect-video min-h-[200px] w-full bg-ink ${hidden ? 'hidden' : ''}`} ref={holder}>
         {!videoId && !problem && <p className="pixel-label absolute inset-0 grid place-items-center text-silver">finding the video…</p>}
       </div>
     </section>

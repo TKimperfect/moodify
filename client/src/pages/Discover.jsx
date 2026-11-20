@@ -54,6 +54,13 @@ function Shelf({ id, label, title, songs }) {
 }
 
 const PAGE = 24; // songs per "Show more"
+// A number for this filter and mix: every new filter gets a new order,
+// "Shuffle again" another one, and "Show more" keeps the current one.
+const seedFor = (text) => {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619) >>> 0;
+  return hash % 2147483647;
+};
 
 // Mood playlists + genre discovery + search, combined into one browser.
 function Browse({ genres, moods, languages }) {
@@ -70,20 +77,26 @@ function Browse({ genres, moods, languages }) {
   }, [text]);
 
   const active = Boolean(mood || genre || language || query);
+  // Shuffled by default, so the same filter does not always open on the same songs.
+  const [sort, setSort] = useState('shuffle');
+  const [visit] = useState(() => Math.floor(Math.random() * 2147483647));
+  const [mix, setMix] = useState(0);
+  const seed = seedFor(`${visit}|${mood}|${genre}|${language}|${query}|${mix}`);
+  const order = sort === 'shuffle' ? { sort, seed } : { sort };
   const results = useApi(
-    (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE }, signal }) : Promise.resolve(null)),
-    [mood, genre, language, query],
+    (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE, ...order }, signal }) : Promise.resolve(null)),
+    [mood, genre, language, query, sort, seed],
   );
-  // "Show more": the next pages, added below the first one. A new filter starts again.
+  // "Show more": the next pages, added below the first one. A new filter or order starts again.
   const [more, setMore] = useState({ key: '', songs: [], status: 'idle', error: null });
-  const filterKey = [mood, genre, language, query].join('|');
+  const filterKey = [mood, genre, language, query, sort, seed].join('|');
   const extra = more.key === filterKey ? more : { key: filterKey, songs: [], status: 'idle', error: null };
   const shown = results.data ? [...results.data.songs, ...extra.songs] : [];
   const total = results.data?.total ?? results.data?.count ?? 0;
   const showMore = async () => {
     setMore({ ...extra, status: 'loading', error: null });
     try {
-      const page = await apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE, offset: shown.length } });
+      const page = await apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE, offset: shown.length, ...order } });
       setMore((current) => (current.key === filterKey ? { ...current, songs: [...current.songs, ...page.songs], status: 'idle' } : current));
     } catch (error) {
       setMore((current) => (current.key === filterKey ? { ...current, status: 'error', error: error.message } : current));
@@ -179,9 +192,26 @@ function Browse({ genres, moods, languages }) {
           {results.status === 'error' && <ErrorPanel message={results.error} onRetry={results.reload} />}
           {active && results.data && (
             <>
-              <p className="pixel-label text-silver">
-                {total} {total === 1 ? 'song' : 'songs'} found{shown.length < total ? ` · showing ${shown.length}` : ''}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="pixel-label text-silver">
+                  {total} {total === 1 ? 'song' : 'songs'} found{shown.length < total ? ` · showing ${shown.length}` : ''}
+                </p>
+                {total > 1 && (
+                  <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Order">
+                    <button type="button" className={`btn-ghost ${sort === 'shuffle' ? 'border-orchid bg-orchid/10 text-orchid' : ''}`} aria-pressed={sort === 'shuffle'} onClick={() => setSort('shuffle')}>
+                      Shuffled
+                    </button>
+                    <button type="button" className={`btn-ghost ${sort === 'popular' ? 'border-orchid bg-orchid/10 text-orchid' : ''}`} aria-pressed={sort === 'popular'} onClick={() => setSort('popular')}>
+                      Most popular
+                    </button>
+                    {sort === 'shuffle' && (
+                      <button type="button" className="btn-ghost" onClick={() => setMix((value) => value + 1)} aria-label="Shuffle again">
+                        ↻ Shuffle again
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               {total === 0 ? (
                 <p className="mt-3 text-silver">Nothing matches that combination. Try removing a filter.</p>
               ) : (

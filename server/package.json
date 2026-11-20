@@ -1,6 +1,6 @@
 {
   "name": "moodify-server",
-  "version": "1.2.26",
+  "version": "1.2.29",
   "private": true,
   "type": "module",
   "engines": {

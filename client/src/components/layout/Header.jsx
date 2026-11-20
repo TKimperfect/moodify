@@ -20,7 +20,7 @@ export default function Header() {
     }`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-ink/80 backdrop-blur-md">
+    <header data-site-header className="sticky top-0 z-50 border-b border-line bg-ink/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2.5" aria-label="MOODIFY home">
           <span className="grid h-6 w-6 grid-cols-2 gap-0.5" aria-hidden="true">

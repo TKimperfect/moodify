@@ -191,6 +191,8 @@ To fix the languages of songs that are already imported, without searching Deeze
 npm run music:relabel-languages
 ```
 
+Only songs that changed since the last run are written to Supabase (rewriting all 100,000 rows each time would leave old copies in the database and slow reading down). To write every song again, for example after restoring the database, add `-- all`.
+
 After changing the language search words, songs from the old searches stay in Supabase, and so do songs whose language turned out to be unknown. `npm run music:prune-languages` shows how many there are; add `-- delete` to remove them. Songs anyone saved, rated or played are always kept.
 
 ```bash
@@ -223,7 +225,7 @@ Also run `npm run music:import` again so Jamendo songs get their language too.
 
 ### 3. Full songs on YouTube (optional, free)
 
-Without this, Deezer songs play a 30-second preview. With it, they play in full in YouTube's own player, shown as a small video window (YouTube requires the player to stay visible). If YouTube has no suitable video, or the owner does not allow playing it on other sites, MOODIFY plays the preview instead and says why. Listeners can switch "Full songs" off in the player. The video window can be dragged anywhere by its title bar (or moved with the arrow keys); double-click the bar to put it back. The browser remembers where it was.
+Without this, Deezer songs play a 30-second preview. With it, they play in full in YouTube's own player, shown as a small video window (YouTube requires the player to stay visible). If YouTube has no suitable video, or the owner does not allow playing it on other sites, MOODIFY plays the preview instead and says why. Listeners can switch "Full songs" off in the player. The video window can be dragged anywhere by its title bar (or moved with the arrow keys); double-click the bar to put it back. The browser remembers where it was, and the window always stays between the header and the player bar. "Hide" folds the video away and pauses the song (YouTube does not allow a song to play while its player is hidden); "Show" or the play button brings it back and plays on.
 
 1. Open https://console.cloud.google.com and create a project (e.g. `moodify`).
 2. **APIs & Services > Library**, search **YouTube Data API v3**, **Enable**.

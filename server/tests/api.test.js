@@ -92,6 +92,18 @@ test('GET /api/songs pages through the matches ("Show more")', async () => {
   assert.equal((await fetch(`${baseUrl}/api/songs?offset=-1`)).status, 400);
 });
 
+test('GET /api/songs can shuffle: the same seed keeps its order across pages, another seed mixes again', async () => {
+  const get = async (query) => (await (await fetch(`${baseUrl}/api/songs?${query}`)).json()).songs.map((song) => song.id);
+  const popular = await get('limit=24');
+  const a = await get('limit=24&sort=shuffle&seed=11');
+  assert.deepEqual(await get('limit=24&sort=shuffle&seed=11'), a); // same seed, same order
+  assert.notDeepEqual(a, popular);
+  assert.notDeepEqual(await get('limit=24&sort=shuffle&seed=12'), a);
+  const next = await get('limit=24&offset=24&sort=shuffle&seed=11');
+  assert.equal(new Set([...a, ...next]).size, 48); // "Show more" never repeats a song
+  assert.equal((await fetch(`${baseUrl}/api/songs?sort=random`)).status, 400);
+});
+
 test('GET /api/songs/:id returns one song or 404', async () => {
   const ok = await fetch(`${baseUrl}/api/songs/sunroom`);
   assert.equal((await ok.json()).song.title, 'Sunroom');

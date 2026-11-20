@@ -114,43 +114,60 @@ let LOCAL = localCatalogue();
 let cache = { songs: LOCAL, source: 'local', loadedAt: 0, problem: null, note: null };
 
 // Supabase returns at most 1000 rows per request, so read page by page.
-// Each page asks for "the next 1000 ids after the last one read" (keyset
+// Each page asks for "the next rows after the last id read" (keyset
 // paging): the database finds them straight from the id index, however far
 // into the table. Paging by row number ("skip 99,000 rows") and counting all
-// rows get slower the bigger the table is and hit Supabase's statement
-// timeout, especially right after many songs were rewritten.
-// The id range is split into slices read side by side (ids look like
-// "deezer-3135553"), so 100,000 songs take a few seconds, not a minute.
-const PAGE = 1000;
+// rows get slower the bigger the table is.
+// The id range is split into slices (ids look like "deezer-3135553"); a few
+// slices are read at a time, so the small free database is not swamped.
+// Supabase stops any request that takes more than a few seconds (statement
+// timeout): such a page is tried again after a short wait, with fewer rows.
+const PAGE = 500;
+const MIN_PAGE = 100;
 const MAX_SONGS = 200_000;
-const SLICES = [null, 'deezer-2', 'deezer-4', 'deezer-6', 'deezer-8', 'e'];
+const SLICES = [null, 'deezer-1', 'deezer-2', 'deezer-3', 'deezer-4', 'deezer-5', 'deezer-6', 'deezer-7', 'deezer-8', 'deezer-9', 'e'];
+const AT_ONCE = 3;
+const WAITS_MS = [1000, 3000, 6000]; // before the 2nd, 3rd and 4th try of a page
 const TIMEOUT = '57014'; // Postgres: statement timeout
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Worth another try: a timeout, an overloaded server, or no answer at all.
+const passing = (error) => error && (error.code === TIMEOUT || /timeout|fetch failed|network|ECONN|503|502|504/i.test(`${error.code} ${error.message}`));
 
 async function readSlice(columns, from, to) {
   const rows = [];
   let after = null;
+  let size = PAGE;
   for (;;) {
     const next = () => {
       let query = getPublicClient().from('songs').select(columns);
       if (after !== null) query = query.gt('id', after);
       else if (from !== null) query = query.gte('id', from);
       if (to !== null) query = query.lt('id', to);
-      return query.order('id').limit(PAGE);
+      return query.order('id').limit(size);
     };
     let result = await next();
-    // A busy database can time out now and then: try that page once more.
-    if (result.error?.code === TIMEOUT) result = await next();
+    for (const wait of WAITS_MS) {
+      if (!passing(result.error)) break;
+      size = Math.max(MIN_PAGE, Math.floor(size / 2));
+      await pause(wait);
+      result = await next();
+    }
     if (result.error) return { data: null, error: result.error };
     rows.push(...result.data);
-    if (result.data.length < PAGE || rows.length >= MAX_SONGS) return { data: rows, error: null };
+    if (result.data.length < size || rows.length >= MAX_SONGS) return { data: rows, error: null };
     after = result.data.at(-1).id;
   }
 }
 
 async function selectSongs(columns) {
-  const results = await Promise.all(SLICES.map((from, index) => readSlice(columns, from, SLICES[index + 1] ?? null)));
-  const failed = results.find((result) => result.error);
-  if (failed) return { data: null, error: failed.error };
+  const results = [];
+  for (let i = 0; i < SLICES.length; i += AT_ONCE) {
+    const batch = SLICES.slice(i, i + AT_ONCE).map((from, index) => readSlice(columns, from, SLICES[i + index + 1] ?? null));
+    const done = await Promise.all(batch);
+    const failed = done.find((result) => result.error);
+    if (failed) return { data: null, error: failed.error };
+    results.push(...done);
+  }
   // Each song once, even if slices were to overlap.
   const byId = new Map(results.flatMap((result) => result.data).map((row) => [row.id, row]));
   return { data: [...byId.values()].slice(0, MAX_SONGS), error: null };
@@ -164,8 +181,9 @@ async function load({ wait = false } = {}) {
   loading ??= readDatabase().finally(() => {
     loading = null;
   });
-  // Songs already read from the database keep being used while the new copy loads.
-  if (cache.source === 'supabase' && !wait) return cache;
+  // Songs already read from the database keep being used while the new copy
+  // loads; after a failed read, the sample songs answer while it tries again.
+  if ((cache.source === 'supabase' || cache.problem) && !wait) return cache;
   return loading;
 }
 
@@ -200,8 +218,9 @@ async function readDatabase() {
     cache = { ...cache, problem, loadedAt: Date.now() - CACHE_MS + RETRY_MS };
     return cache;
   }
-  if (cache.problem !== problem) console.warn(`[songs] ${problem}. Using built-in sample songs.`);
-  cache = { songs: LOCAL, source: 'local', loadedAt: Date.now(), problem, note: null };
+  if (cache.problem !== problem) console.warn(`[songs] ${problem}. Using built-in sample songs for now; trying again in a minute.`);
+  // Try the database again in a minute, not only after the usual 6 hours.
+  cache = { songs: LOCAL, source: 'local', loadedAt: Date.now() - CACHE_MS + RETRY_MS, problem, note: null };
   return cache;
 }
 
