@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePlayer } from '../../context/PlayerContext.jsx';
+import PixelGlyph from '../ui/PixelGlyph.jsx';
+import { ICONS } from './icons.js';
 import { loadYouTubeApi, youtubeErrorMessage } from '../../lib/youtubeApi.js';
 
 // Where the listener last moved the window (kept in this browser only).
@@ -206,9 +208,11 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
           savePosition(null);
         }}
       >
-        <span className="pixel-label truncate">
-          {small ? '' : <span className="sm:hidden">youtube</span>}
-          {small ? '' : <span className="hidden sm:inline">full song · youtube</span>}
+        {/* The grip and all free space in the bar are the handle for dragging. */}
+        <span className="pixel-label flex min-w-0 flex-1 items-center gap-2 self-stretch py-1 text-silver">
+          <PixelGlyph rows={ICONS.grip} className="h-3 w-3 shrink-0" />
+          {small ? null : <span className="truncate sm:hidden">youtube</span>}
+          {small ? null : <span className="hidden truncate sm:inline">full song · youtube</span>}
         </span>
         {/* Padding gives fingers a big enough target; the negative margin keeps the bar slim. */}
         <span className="-my-2 flex shrink-0 items-center gap-1">
@@ -219,7 +223,7 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
             aria-label={`Window size: ${SIZES[size].name}. Change to ${SIZES[nextSize].name}`}
             title={`Size: ${SIZES[size].name} (click for ${SIZES[nextSize].name})`}
           >
-            size {SIZES[size].label}
+            {small ? SIZES[size].label : `size ${SIZES[size].label}`}
           </button>
           <button
             type="button"
@@ -237,7 +241,7 @@ export default function YouTubeWindow({ hidden = false, onHide }) {
             aria-label="Hide the video (pauses the song: YouTube songs only play while the video is visible). Show it again from the player bar."
             title="Hide the video (pauses the song). Show it again from the player bar."
           >
-            hide —
+            {small ? '—' : 'hide —'}
           </button>
         </span>
       </div>
