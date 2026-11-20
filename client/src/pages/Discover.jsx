@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Choice from '../components/ui/Choice.jsx';
 import { LoadingPanel, ErrorPanel } from '../components/ui/StatePanels.jsx';
 import SongTile from '../components/music/SongTile.jsx';
@@ -54,13 +54,6 @@ function Shelf({ id, label, title, songs }) {
 }
 
 const PAGE = 24; // songs per "Show more"
-// A number for this filter and mix: every new filter gets a new order,
-// "Shuffle again" another one, and "Show more" keeps the current one.
-const seedFor = (text) => {
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i += 1) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619) >>> 0;
-  return hash % 2147483647;
-};
 
 // Mood playlists + genre discovery + search, combined into one browser.
 function Browse({ genres, moods, languages }) {
@@ -79,9 +72,11 @@ function Browse({ genres, moods, languages }) {
   const active = Boolean(mood || genre || language || query);
   // Shuffled by default, so the same filter does not always open on the same songs.
   const [sort, setSort] = useState('shuffle');
-  const [visit] = useState(() => Math.floor(Math.random() * 2147483647));
+  // A new random order every time a filter is chosen (also when going back
+  // to one chosen before) and on "Shuffle again"; "Show more" keeps it.
   const [mix, setMix] = useState(0);
-  const seed = seedFor(`${visit}|${mood}|${genre}|${language}|${query}|${mix}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const seed = useMemo(() => Math.floor(Math.random() * 2147483647), [mood, genre, language, query, mix]);
   const order = sort === 'shuffle' ? { sort, seed } : { sort };
   const results = useApi(
     (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE, ...order }, signal }) : Promise.resolve(null)),

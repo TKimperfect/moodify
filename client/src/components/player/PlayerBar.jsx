@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Artwork from '../ui/Artwork.jsx';
 import PixelGlyph from '../ui/PixelGlyph.jsx';
 import QueuePanel from './QueuePanel.jsx';
@@ -38,6 +38,29 @@ export default function PlayerBar() {
   const player = usePlayer();
   const [queueOpen, setQueueOpen] = useState(false);
   const song = player.current;
+
+  // The YouTube video can be hidden. YouTube's rules do not allow a song to
+  // play while its player is hidden, so hiding pauses the song, and playing
+  // (here or anywhere else) shows the video again.
+  const [videoHidden, setVideoHidden] = useState(false);
+  const resumeOnShow = useRef(false);
+  const busy = player.status === 'playing' || player.status === 'loading';
+  const wasBusy = useRef(busy);
+  useEffect(() => {
+    if (videoHidden && busy && !wasBusy.current) setVideoHidden(false);
+    wasBusy.current = busy;
+  }, [busy, videoHidden]);
+  const hideVideo = () => {
+    resumeOnShow.current = busy;
+    if (busy) player.togglePlay();
+    setVideoHidden(true);
+  };
+  const showVideo = () => {
+    setVideoHidden(false);
+    if (resumeOnShow.current && !busy) player.togglePlay();
+    resumeOnShow.current = false;
+  };
+
   if (!song && player.queue.length === 0) return null;
 
   const onYouTube = player.engine === 'youtube';
@@ -52,7 +75,7 @@ export default function PlayerBar() {
   return (
     <>
       {queueOpen && <QueuePanel onClose={() => setQueueOpen(false)} />}
-      {onYouTube && song && <YouTubeWindow />}
+      {onYouTube && song && <YouTubeWindow hidden={videoHidden} onHide={hideVideo} />}
       <section className="player-bar fixed inset-x-0 bottom-0 z-40" aria-label="Music player">
         {/* Progress bar (full width, on top) */}
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pt-2 sm:px-6">
@@ -82,6 +105,20 @@ export default function PlayerBar() {
               <p className="truncate text-xs text-silver">{song?.artist}</p>
               <p className="pixel-label mt-0.5 truncate text-rose" aria-live="polite">
                 {statusText}
+                {onYouTube && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      className="pixel-label text-rose underline underline-offset-2 hover:text-frost"
+                      onClick={videoHidden ? showVideo : hideVideo}
+                      aria-pressed={!videoHidden}
+                      title={videoHidden ? 'Show the YouTube video and play on' : 'Hide the YouTube video (pauses the song)'}
+                    >
+                      {videoHidden ? 'show video' : 'hide video'}
+                    </button>
+                  </>
+                )}
                 {!onYouTube && song?.playback?.links?.[0] && (song.playback.source === 'jamendo' || !playable) && (
                   <>
                     {' · '}
