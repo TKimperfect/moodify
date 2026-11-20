@@ -2,7 +2,7 @@
 
 AI-powered emotional music discovery. *Music that understands how you feel.*
 
-**Current status: 1.2** – mood data from two research datasets (MTG-Jamendo human tags, MuSe listener scores), songs in seven languages, full songs through YouTube (optional), Credits page. Deployed: frontend on Vercel, backend on Render, database on Supabase.
+**Current status: 1.2** – mood data from two research datasets (MTG-Jamendo human tags, MuSe listener scores), songs in six languages (Chinese covers Mandarin and Cantonese), full songs through YouTube (optional), Credits page. Deployed: frontend on Vercel, backend on Render, database on Supabase.
 
 ## What you need installed
 

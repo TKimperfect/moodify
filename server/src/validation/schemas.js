@@ -40,6 +40,7 @@ export const songSearchSchema = z.strictObject({
     .pipe(z.array(songId).max(50))
     .optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
 
 export const songParamsSchema = z.strictObject({ id: songId });

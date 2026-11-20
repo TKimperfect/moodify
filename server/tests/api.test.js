@@ -78,6 +78,20 @@ test('GET /api/songs searches by text, mood and genre', async () => {
   assert.equal((await fetch(`${baseUrl}/api/songs?limit=9999`)).status, 400);
 });
 
+test('GET /api/songs pages through the matches ("Show more")', async () => {
+  const first = await (await fetch(`${baseUrl}/api/songs?limit=24`)).json();
+  assert.equal(first.count, 24);
+  assert.ok(first.total > 24); // all matching songs, not just this page
+  const second = await (await fetch(`${baseUrl}/api/songs?limit=24&offset=24`)).json();
+  assert.equal(second.offset, 24);
+  assert.equal(second.total, first.total);
+  const ids = [...first.songs, ...second.songs].map((song) => song.id);
+  assert.equal(new Set(ids).size, ids.length); // no song twice
+  const past = await (await fetch(`${baseUrl}/api/songs?limit=24&offset=${first.total}`)).json();
+  assert.equal(past.count, 0);
+  assert.equal((await fetch(`${baseUrl}/api/songs?offset=-1`)).status, 400);
+});
+
 test('GET /api/songs/:id returns one song or 404', async () => {
   const ok = await fetch(`${baseUrl}/api/songs/sunroom`);
   assert.equal((await ok.json()).song.title, 'Sunroom');

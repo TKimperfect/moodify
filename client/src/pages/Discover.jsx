@@ -53,6 +53,8 @@ function Shelf({ id, label, title, songs }) {
   );
 }
 
+const PAGE = 24; // songs per "Show more"
+
 // Mood playlists + genre discovery + search, combined into one browser.
 function Browse({ genres, moods, languages }) {
   const [mood, setMood] = useState('');
@@ -69,9 +71,24 @@ function Browse({ genres, moods, languages }) {
 
   const active = Boolean(mood || genre || language || query);
   const results = useApi(
-    (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: 24 }, signal }) : Promise.resolve(null)),
+    (signal) => (active ? apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE }, signal }) : Promise.resolve(null)),
     [mood, genre, language, query],
   );
+  // "Show more": the next pages, added below the first one. A new filter starts again.
+  const [more, setMore] = useState({ key: '', songs: [], status: 'idle', error: null });
+  const filterKey = [mood, genre, language, query].join('|');
+  const extra = more.key === filterKey ? more : { key: filterKey, songs: [], status: 'idle', error: null };
+  const shown = results.data ? [...results.data.songs, ...extra.songs] : [];
+  const total = results.data?.total ?? results.data?.count ?? 0;
+  const showMore = async () => {
+    setMore({ ...extra, status: 'loading', error: null });
+    try {
+      const page = await apiGet('/songs', { params: { mood, genre, language, q: query, limit: PAGE, offset: shown.length } });
+      setMore((current) => (current.key === filterKey ? { ...current, songs: [...current.songs, ...page.songs], status: 'idle' } : current));
+    } catch (error) {
+      setMore((current) => (current.key === filterKey ? { ...current, status: 'error', error: error.message } : current));
+    }
+  };
   const moodCount = (id) => moods.find((item) => item.id === id)?.count ?? 0;
 
   return (
@@ -163,16 +180,24 @@ function Browse({ genres, moods, languages }) {
           {active && results.data && (
             <>
               <p className="pixel-label text-silver">
-                {results.data.count} {results.data.count === 1 ? 'song' : 'songs'} found
+                {total} {total === 1 ? 'song' : 'songs'} found{shown.length < total ? ` · showing ${shown.length}` : ''}
               </p>
-              {results.data.count === 0 ? (
+              {total === 0 ? (
                 <p className="mt-3 text-silver">Nothing matches that combination. Try removing a filter.</p>
               ) : (
                 <ul className={`mt-4 grid grid-cols-1 gap-4 transition-opacity sm:grid-cols-2 xl:grid-cols-3 ${results.status === 'loading' ? 'opacity-50' : ''}`}>
-                  {results.data.songs.map((song) => (
-                    <SongTile key={song.id} song={song} list={results.data.songs} />
+                  {shown.map((song) => (
+                    <SongTile key={song.id} song={song} list={shown} />
                   ))}
                 </ul>
+              )}
+              {shown.length < total && (
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button type="button" className="btn-ghost" onClick={showMore} disabled={extra.status === 'loading'}>
+                    {extra.status === 'loading' ? 'Loading…' : `Show ${Math.min(PAGE, total - shown.length)} more`}
+                  </button>
+                  {extra.status === 'error' && <span className="text-rose">{extra.error}</span>}
+                </div>
               )}
             </>
           )}

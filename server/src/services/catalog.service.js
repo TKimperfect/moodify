@@ -13,17 +13,22 @@ const FEATURED_IDS = [
 
 const byPopularity = (a, b) => b.popularity - a.popularity;
 
-export async function searchSongs({ q, mood, genre, language, ids, limit }) {
-  if (ids) return songRepository.findByIds(ids);
+// Returns one page of the matching songs and how many match in total
+// (offset = how many were shown already, for "Show more").
+export async function searchSongs({ q, mood, genre, language, ids, limit, offset = 0 }) {
+  if (ids) {
+    const songs = await songRepository.findByIds(ids);
+    return { songs, total: songs.length };
+  }
   const needle = q?.trim().toLowerCase();
   const all = await songRepository.findAll();
-  return all
+  const matches = all
     .filter((song) => !mood || song.moods.includes(mood))
     .filter((song) => !genre || song.genres.includes(genre))
     .filter((song) => !language || song.language === language)
     .filter((song) => !needle || `${song.title} ${song.artist}`.toLowerCase().includes(needle))
-    .sort(byPopularity)
-    .slice(0, limit);
+    .sort(byPopularity);
+  return { songs: matches.slice(offset, offset + limit), total: matches.length };
 }
 
 export async function getSong(id) {
